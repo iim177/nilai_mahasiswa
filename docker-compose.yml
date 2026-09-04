@@ -1,0 +1,36 @@
+# ============================================================
+# docker-compose.yml - SINDO
+# ============================================================
+# MySQL TIDAK ikut di sini karena sudah ada MySQL sendiri di VPS (di luar Docker).
+# Aplikasi ini akan connect ke MySQL itu lewat variabel di file .env
+# (lihat DEPLOYMENT.md untuk penjelasan DB_HOST yang benar).
+
+services:
+  sindo:
+    build: .
+    container_name: sindo_app
+    restart: unless-stopped
+    ports:
+      - "5003:8000"
+    env_file:
+      - .env
+    # extra_hosts ini WAJIB karena MySQL terinstall langsung di OS VPS (bukan container lain).
+    # Ini membuat container bisa mengakses VPS lewat alamat host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # ---------------------------------------------------------------
+    # KALAU MAU PAKAI CLOUDFLARE TUNNEL:
+    # Container ini perlu satu Docker network yang sama dengan container
+    # `cloudflared` boss, supaya cloudflared bisa "memanggil" sindo_app
+    # lewat nama container (bukan lewat IP publik VPS).
+    #
+    # 1. Cari nama network yang dipakai cloudflared:
+    #      docker inspect cloudflared --format '{{json .NetworkSettings.Networks}}'
+    # 2. Uncomment 2 baris di bawah ini, ganti NAMA_NETWORK_CLOUDFLARED
+    #    dengan hasil dari langkah 1:
+    #
+    # networks:
+    #   default:
+    #     name: NAMA_NETWORK_CLOUDFLARED
+    #     external: true
+    # ---------------------------------------------------------------

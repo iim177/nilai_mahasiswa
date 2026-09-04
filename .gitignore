@@ -1,5 +1,10 @@
 venv/
+venv_sim/
 __pycache__/
 *.pyc
 .env
+.env.production
+.env.local
 *.db
+.DS_Store
+*.log
