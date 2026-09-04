@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}{{ kelas.mata_kuliah.nama_makul }}{% endblock %}
+
+{% macro spreadsheet_harian(judul, jenis, items, anggota, peta, kelas_id, anchor_id) %}
+<div id="{{ anchor_id }}" class="bg-white rounded-xl border border-slate-200 p-5 mb-6 scroll-mt-6">
+  <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+    <h2 class="font-semibold text-sm text-ink-900">{{ judul }}</h2>
+    <form method="post" action="/kelas/{{ kelas_id }}/item-nilai/tambah" class="flex gap-2">
+      <input type="hidden" name="jenis" value="{{ jenis }}">
+      <input type="text" name="nama" required placeholder="Nama, misal: {{ 'Tugas Pertemuan 3' if jenis=='tugas' else 'Kuis 2' }}"
+             class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 w-56">
+      <button class="bg-ink-900 hover:bg-ink-800 text-white text-xs font-medium rounded-lg px-3 py-1.5 whitespace-nowrap">+ Tambah Kolom</button>
+    </form>
+  </div>
+
+  {% if not items %}
+  <p class="text-sm text-slate-400 py-4">Belum ada kolom {{ 'tugas' if jenis=='tugas' else 'kuis' }}. Tambahkan kolom pertama lewat form di atas.</p>
+  {% elif not anggota %}
+  <p class="text-sm text-slate-400 py-4">Belum ada mahasiswa di kelas ini.</p>
+  {% else %}
+  <form method="post" action="/kelas/{{ kelas_id }}/item-nilai/simpan">
+    <input type="hidden" name="jenis" value="{{ jenis }}">
+    <div class="overflow-x-auto">
+      <table class="text-sm min-w-full">
+        <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-2.5 sticky left-0 bg-slate-50">Nama</th>
+            {% for it in items %}
+            <th class="text-center px-2 py-2.5 w-24">
+              <span class="normal-case font-medium text-ink-900 block truncate max-w-[90px] mx-auto" title="{{ it.nama }}">{{ it.nama }}</span>
+            </th>
+            {% endfor %}
+            <th class="text-center px-3 py-2.5 w-20">Rata²</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for km in anggota %}
+          <tr>
+            <td class="px-4 py-2 sticky left-0 bg-white font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
+            {% for it in items %}
+            <td class="px-2 py-2">
+              {% set nilai_sel = peta.get((it.id, km.id)) %}
+              <input type="number" step="0.1" min="0" max="100" name="nilai_{{ it.id }}_{{ km.id }}"
+                     value="{{ nilai_sel if nilai_sel is not none else '' }}"
+                     class="w-16 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+            </td>
+            {% endfor %}
+            <td class="px-3 py-2 text-center font-semibold text-ink-900">
+              {% set rr = km.rata_rata_harian(jenis) %}
+              {{ '%.1f'|format(rr) if rr is not none else '-' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-4">
+      <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg px-6 py-2.5">Simpan Nilai {{ 'Tugas' if jenis=='tugas' else 'Kuis' }}</button>
+      <span class="text-xs text-slate-400 ml-2">Kolom "Rata²" otomatis dipakai sebagai nilai {{ 'Tugas' if jenis=='tugas' else 'Kuis' }} kalau tidak di-override manual di tabel ringkasan bawah.</span>
+    </div>
+  </form>
+
+  <!-- Kelola kolom (hapus) - form TERPISAH di luar form simpan nilai, biar tidak nested -->
+  <details class="mt-4">
+    <summary class="text-xs text-slate-400 cursor-pointer">Kelola kolom {{ 'tugas' if jenis=='tugas' else 'kuis' }} (hapus kolom)</summary>
+    <div class="mt-2 bg-slate-50 border border-slate-200 rounded-lg divide-y divide-slate-200">
+      {% for it in items %}
+      <div class="flex items-center justify-between px-4 py-2 text-sm gap-6">
+        <span>{{ it.nama }}</span>
+        <form method="post" action="/kelas/{{ kelas_id }}/item-nilai/{{ it.id }}/hapus" onsubmit="return confirm('Hapus kolom {{ it.nama }}? Semua nilai di kolom ini akan hilang.')">
+          <button type="submit" class="text-red-500 hover:underline text-xs">Hapus</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="mb-6">
+  <a href="/kelas" class="text-xs text-slate-500 hover:text-amber-600">&larr; Kembali ke daftar kelas</a>
+  <div class="flex items-start justify-between flex-wrap gap-3 mt-2">
+    <div>
+      <h1 class="font-display text-2xl text-ink-900">{{ kelas.mata_kuliah.nama_makul }}</h1>
+      <p class="text-slate-500 text-sm mt-1">Kelas {{ kelas.nama_kelas }} &middot; {{ kelas.tahun_ajaran.nama_tahun_ajaran }} &middot; {{ kelas.dosen.nama_lengkap if kelas.dosen else '-' }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/kelas/{{ kelas.id }}/export/pdf" class="text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-4 py-2 text-ink-900">Cetak PDF</a>
+      <a href="/kelas/{{ kelas.id }}/export/excel" class="text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-4 py-2 text-ink-900">Export Excel</a>
+    </div>
+  </div>
+</div>
+
+<!-- BOBOT NILAI -->
+<div x-data="{ open: false }" class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <div class="flex items-center justify-between gap-3">
+    <button @click="open = !open" class="flex-1 flex items-center justify-between text-left">
+      <div>
+        <h2 class="font-semibold text-sm text-ink-900">Bobot Komponen Nilai & Nilai Akhir</h2>
+        {% if kelas.pakai_bobot %}
+        <p class="text-xs text-slate-500 mt-0.5">
+          Tugas {{ kelas.bobot_tugas|round(0)|int }}% &middot; Kuis {{ kelas.bobot_kuis|round(0)|int }}% &middot;
+          UTS {{ kelas.bobot_uts|round(0)|int }}% &middot; UAS {{ kelas.bobot_uas|round(0)|int }}%
+        </p>
+        {% else %}
+        <p class="text-xs text-slate-400 mt-0.5">Dimatikan — kelas ini tidak menghitung Nilai Akhir.</p>
+        {% endif %}
+      </div>
+      <span class="text-xs text-amber-600" x-text="open ? 'Tutup' : 'Ubah bobot'"></span>
+    </button>
+  </div>
+
+  <div x-show="open" x-cloak class="mt-4 pt-4 border-t border-slate-100">
+    <!-- Toggle Aktif/Nonaktif -->
+    <form method="post" action="/kelas/{{ kelas.id }}/toggle-bobot" class="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 mb-4">
+      <div>
+        <p class="text-sm font-medium text-ink-900">Gunakan Bobot & Hitung Nilai Akhir</p>
+        <p class="text-xs text-slate-500 mt-0.5">Matikan kalau nilai per komponen mau diimpor manual ke SIAKAD tanpa perlu nilai akhir dari sini.</p>
+      </div>
+      <button type="submit" class="shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition {{ 'bg-amber-500' if kelas.pakai_bobot else 'bg-slate-300' }}">
+        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition {{ 'translate-x-6' if kelas.pakai_bobot else 'translate-x-1' }}"></span>
+      </button>
+    </form>
+
+    {% if kelas.pakai_bobot %}
+    {% if error_bobot %}
+    <p class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 mb-3">{{ error_bobot }}</p>
+    {% endif %}
+    <form method="post" action="/kelas/{{ kelas.id }}/bobot" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Tugas (%)</label>
+        <input type="number" step="0.1" name="bobot_tugas" value="{{ kelas.bobot_tugas }}" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Kuis (%)</label>
+        <input type="number" step="0.1" name="bobot_kuis" value="{{ kelas.bobot_kuis }}" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">UTS (%)</label>
+        <input type="number" step="0.1" name="bobot_uts" value="{{ kelas.bobot_uts }}" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">UAS (%)</label>
+        <input type="number" step="0.1" name="bobot_uas" value="{{ kelas.bobot_uas }}" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      </div>
+      <div class="col-span-2 md:col-span-4 flex items-center gap-3">
+        <button class="bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg px-5 py-2.5">Simpan Bobot</button>
+        <p class="text-xs text-slate-400">Total keempat kolom harus tepat 100%.</p>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- TAMBAH MAHASISWA KE KELAS -->
+<div x-data="{ open: false }" class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <button @click="open = !open" class="w-full flex items-center justify-between text-left">
+    <h2 class="font-semibold text-sm text-ink-900">Tambahkan Mahasiswa ke Kelas Ini</h2>
+    <span class="text-xs text-amber-600" x-text="open ? 'Tutup' : 'Tambah'"></span>
+  </button>
+  <div x-show="open" x-cloak class="mt-4 pt-4 border-t border-slate-100">
+    {% if mahasiswa_belum_terdaftar %}
+    <form method="post" action="/kelas/{{ kelas.id }}/assign" class="flex flex-wrap gap-3">
+      <select name="mahasiswa_id" required class="flex-1 min-w-[220px] rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        {% for m in mahasiswa_belum_terdaftar %}
+        <option value="{{ m.id }}">{{ m.nama }} — {{ m.npm }}</option>
+        {% endfor %}
+      </select>
+      <button class="bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg px-5 py-2.5">Tambahkan</button>
+    </form>
+    <p class="text-xs text-slate-400 mt-2">Mahasiswa belum ada di daftar? <a href="/mahasiswa" class="text-amber-600 hover:underline">Tambahkan / import dulu di sini.</a></p>
+    {% else %}
+    <p class="text-sm text-slate-400">Semua mahasiswa yang terdaftar di sistem sudah ada di kelas ini. <a href="/mahasiswa" class="text-amber-600 hover:underline">Tambah mahasiswa baru.</a></p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- NILAI TUGAS HARIAN -->
+{{ spreadsheet_harian("Nilai Tugas Harian", "tugas", item_tugas, anggota, peta_nilai_harian, kelas.id, "tugas") }}
+
+<!-- NILAI KUIS -->
+{{ spreadsheet_harian("Nilai Kuis", "kuis", item_kuis, anggota, peta_nilai_harian, kelas.id, "kuis") }}
+
+<!-- TABEL NILAI RINGKASAN -->
+<div class="mb-2">
+  <h2 class="font-semibold text-sm text-ink-900">Ringkasan Nilai & Nilai Akhir</h2>
+  <p class="text-xs text-slate-500 mt-0.5">Kolom Tugas & Kuis otomatis terisi dari rata-rata di atas. Ketik manual di sini untuk override (menimpa nilai otomatis); kosongkan lagi untuk kembali pakai rata-rata otomatis.</p>
+</div>
+<form method="post" action="/kelas/{{ kelas.id }}/nilai/simpan-semua">
+<div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm min-w-[820px]">
+    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+      <tr>
+        <th class="text-left px-4 py-3">NPM</th>
+        <th class="text-left px-4 py-3">Nama</th>
+        <th class="text-center px-3 py-3 w-28">Tugas</th>
+        <th class="text-center px-3 py-3 w-28">Kuis</th>
+        <th class="text-center px-3 py-3 w-24">UTS</th>
+        <th class="text-center px-3 py-3 w-24">UAS</th>
+        {% if kelas.pakai_bobot %}
+        <th class="text-center px-3 py-3 w-24">Akhir</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for a in anggota %}
+      <tr>
+        <td class="px-4 py-2.5 text-slate-500">{{ a.mahasiswa.npm }}</td>
+        <td class="px-4 py-2.5 font-medium text-ink-900">{{ a.mahasiswa.nama }}</td>
+        <td class="px-2 py-2">
+          {% set rr_tugas = a.rata_rata_harian('tugas') %}
+          <input type="number" step="0.1" min="0" max="100" name="tugas_{{ a.id }}"
+                 value="{{ a.nilai_tugas if a.nilai_tugas is not none else '' }}"
+                 placeholder="{{ '%.1f'|format(rr_tugas) if rr_tugas is not none else 'otomatis' }}"
+                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </td>
+        <td class="px-2 py-2">
+          {% set rr_kuis = a.rata_rata_harian('kuis') %}
+          <input type="number" step="0.1" min="0" max="100" name="kuis_{{ a.id }}"
+                 value="{{ a.nilai_kuis if a.nilai_kuis is not none else '' }}"
+                 placeholder="{{ '%.1f'|format(rr_kuis) if rr_kuis is not none else 'otomatis' }}"
+                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </td>
+        <td class="px-2 py-2"><input type="number" step="0.1" min="0" max="100" name="uts_{{ a.id }}" value="{{ a.nilai_uts if a.nilai_uts is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
+        <td class="px-2 py-2"><input type="number" step="0.1" min="0" max="100" name="uas_{{ a.id }}" value="{{ a.nilai_uas if a.nilai_uas is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
+        {% if kelas.pakai_bobot %}
+        <td class="px-3 py-2 text-center font-semibold text-ink-900">{{ '%.1f'|format(a.nilai_akhir()) if a.nilai_akhir() is not none else '-' }}</td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ 7 if kelas.pakai_bobot else 6 }}" class="px-4 py-10 text-center text-slate-400">Belum ada mahasiswa di kelas ini.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if anggota %}
+<div class="mt-4">
+  <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg px-6 py-2.5">Simpan Semua Nilai</button>
+  <span class="text-xs text-slate-400 ml-2">Kolom Tugas/Kuis kosong = pakai nilai otomatis (angka abu-abu). UTS/UAS kosong = belum dinilai.</span>
+</div>
+{% endif %}
+</form>
+
+{% if anggota %}
+<div class="mt-3 text-right">
+  <details class="inline-block text-left w-full md:w-auto">
+    <summary class="text-xs text-slate-400 cursor-pointer">Kelola anggota kelas (keluarkan mahasiswa)</summary>
+    <div class="mt-2 bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+      {% for a in anggota %}
+      <div class="flex items-center justify-between px-4 py-2 text-sm gap-6">
+        <span>{{ a.mahasiswa.nama }} — {{ a.mahasiswa.npm }}</span>
+        <form method="post" action="/kelas/{{ kelas.id }}/keluarkan/{{ a.id }}" onsubmit="return confirm('Keluarkan mahasiswa ini dari kelas? Nilainya di kelas ini akan terhapus.')">
+          <button class="text-red-500 hover:underline text-xs">Keluarkan</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+</div>
+{% endif %}
+{% endblock %}

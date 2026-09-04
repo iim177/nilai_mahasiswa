@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="mb-8">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Dosen</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Selamat datang, {{ user.nama_lengkap.split(' ')[0] }}</h1>
+  <p class="text-slate-500 text-sm mt-1">Berikut kelas yang kamu ampu.</p>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4">
+  {% for k in kelas_list %}
+  <a href="/kelas/{{ k.id }}" class="block bg-white rounded-xl border border-slate-200 p-5 hover:border-amber-400 hover:shadow-sm transition">
+    <p class="font-semibold text-ink-900">{{ k.mata_kuliah.nama_makul }}</p>
+    <p class="text-sm text-slate-500 mt-0.5">Kelas {{ k.nama_kelas }} &middot; {{ k.tahun_ajaran.nama_tahun_ajaran }}</p>
+    <p class="text-xs text-slate-400 mt-2">{{ k.anggota|length }} mahasiswa terdaftar</p>
+  </a>
+  {% else %}
+  <div class="md:col-span-2 bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-400 text-sm">
+    Belum ada kelas yang ditugaskan ke kamu. Hubungi Superadmin untuk dibuatkan kelas.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

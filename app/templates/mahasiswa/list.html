@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Data Mahasiswa{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Akademik</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Data Mahasiswa</h1>
+  <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign ke kelas dilakukan dari halaman detail Kelas.</p>
+</div>
+
+{% if pesan %}
+<div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-6">{{ pesan }}</div>
+{% endif %}
+
+<!-- FILTER & PENCARIAN -->
+<form method="get" action="/mahasiswa" id="filterForm" class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Fakultas</label>
+        <select name="fakultas_id" onchange="document.getElementById('f_prodi').value=''; document.getElementById('f_kelas').value=''; document.getElementById('filterForm').submit()"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">Semua Fakultas</option>
+          {% for f in fakultas_list %}
+          <option value="{{ f.id }}" {{ 'selected' if f_fakultas_id==f.id }}>{{ f.nama_fakultas }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Program Studi</label>
+        <select id="f_prodi" name="prodi_id" onchange="document.getElementById('f_kelas').value=''; document.getElementById('filterForm').submit()"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">Semua Prodi</option>
+          {% for p in prodi_list_filter %}
+          <option value="{{ p.id }}" {{ 'selected' if f_prodi_id==p.id }}>{{ p.nama_prodi }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Kelas</label>
+        <select id="f_kelas" name="kelas_id" onchange="document.getElementById('filterForm').submit()"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">Semua Kelas</option>
+          {% for k in kelas_list_filter %}
+          <option value="{{ k.id }}" {{ 'selected' if f_kelas_id==k.id }}>{{ k.mata_kuliah.nama_makul }} - {{ k.nama_kelas }} ({{ k.tahun_ajaran.nama_tahun_ajaran }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if f_fakultas_id or f_prodi_id or f_kelas_id or q %}
+      <a href="/mahasiswa" class="text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-3 py-2 text-ink-900">Reset</a>
+      {% endif %}
+    </div>
+
+    <!-- Kotak pencarian nama/NPM -->
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Cari Nama / NPM</label>
+      <div class="flex gap-2">
+        <input type="text" name="q" value="{{ q }}" placeholder="Ketik nama atau NPM..."
+               class="rounded-lg border border-slate-300 px-3.5 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <button type="submit" class="bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg px-4 py-2">Cari</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-5 py-3">NPM</th>
+          <th class="text-left px-5 py-3">Nama</th>
+          <th class="text-left px-5 py-3">Kelas</th>
+          <th class="w-20"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for m in data %}
+        <tr>
+          <td class="px-5 py-3 text-slate-500 whitespace-nowrap">{{ m.npm }}</td>
+          <td class="px-5 py-3 whitespace-nowrap">{{ m.nama }}</td>
+          <td class="px-5 py-3">
+            {% set daftar_kelas = kelas_per_mahasiswa.get(m.id, []) %}
+            {% if daftar_kelas %}
+            <div class="flex flex-wrap gap-1">
+              {% for k in daftar_kelas %}
+              <a href="/kelas/{{ k.id }}" class="inline-block bg-slate-100 hover:bg-amber-100 text-slate-600 text-xs rounded-full px-2.5 py-1 whitespace-nowrap">{{ k.mata_kuliah.nama_makul }} - {{ k.nama_kelas }}</a>
+              {% endfor %}
+            </div>
+            {% else %}
+            <span class="text-slate-300 text-xs">Belum ada kelas</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right whitespace-nowrap">
+            <form method="post" action="/mahasiswa/{{ m.id }}/hapus" onsubmit="return confirm('Hapus mahasiswa ini? Dia juga akan hilang dari semua kelas.')">
+              <button class="text-red-500 hover:underline text-xs">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="px-5 py-8 text-center text-slate-400">
+          {% if q or f_fakultas_id or f_prodi_id or f_kelas_id %}Tidak ada mahasiswa yang cocok dengan filter/pencarian ini.{% else %}Belum ada data mahasiswa.{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <h2 class="font-semibold text-sm text-ink-900 mb-3">Tambah Manual</h2>
+      <form method="post" action="/mahasiswa/tambah" class="space-y-3">
+        <input type="text" name="npm" required placeholder="NPM"
+               class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <input type="text" name="nama" required placeholder="Nama Lengkap"
+               class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan</button>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <h2 class="font-semibold text-sm text-ink-900 mb-1">Import dari Excel</h2>
+      <p class="text-xs text-slate-500 mb-3">Kolom: NPM, Nama. <a href="/mahasiswa/template-excel" class="text-amber-600 hover:underline">Download template</a></p>
+      <form method="post" action="/mahasiswa/import" enctype="multipart/form-data" class="space-y-3">
+        <input type="file" name="file" accept=".xlsx" required
+               class="w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-sm file:font-medium hover:file:bg-slate-200">
+        <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Import</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

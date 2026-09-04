@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Mata Kuliah{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Superadmin</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Mata Kuliah</h1>
+</div>
+
+{% if not prodi_list %}
+<div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-6">
+  Belum ada Program Studi. <a href="/superadmin/prodi" class="underline font-medium">Buat prodi dulu</a> sebelum menambah mata kuliah.
+</div>
+{% endif %}
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-5 py-3">Kode</th>
+          <th class="text-left px-5 py-3">Mata Kuliah</th>
+          <th class="text-left px-5 py-3">Prodi</th>
+          <th class="text-left px-5 py-3">SKS</th>
+          <th class="w-20"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for m in data %}
+        <tr>
+          <td class="px-5 py-3 text-slate-500">{{ m.kode_makul or '-' }}</td>
+          <td class="px-5 py-3">{{ m.nama_makul }}</td>
+          <td class="px-5 py-3 text-slate-500">{{ m.prodi.nama_prodi }}</td>
+          <td class="px-5 py-3">{{ m.sks }}</td>
+          <td class="px-5 py-3 text-right">
+            <form method="post" action="/superadmin/matakuliah/{{ m.id }}/hapus" onsubmit="return confirm('Hapus mata kuliah ini?')">
+              <button class="text-red-500 hover:underline text-xs">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="px-5 py-8 text-center text-slate-400">Belum ada data mata kuliah.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-5 h-fit">
+    <h2 class="font-semibold text-sm text-ink-900 mb-3">Tambah Mata Kuliah</h2>
+    <form method="post" action="/superadmin/matakuliah/tambah" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Program Studi</label>
+        <select name="prodi_id" required class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          {% for p in prodi_list %}
+          <option value="{{ p.id }}">{{ p.nama_prodi }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Nama Mata Kuliah</label>
+        <input type="text" name="nama_makul" required placeholder="Contoh: Basis Data"
+               class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Kode (opsional)</label>
+          <input type="text" name="kode_makul" placeholder="IF301"
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">SKS</label>
+          <input type="number" name="sks" value="2" min="1" max="6" required
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+      </div>
+      <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

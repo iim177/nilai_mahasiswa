@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Tahun Ajaran{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Superadmin</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Tahun Ajaran</h1>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+        <tr><th class="text-left px-5 py-3">Tahun Ajaran</th><th class="w-20"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for t in data %}
+        <tr>
+          <td class="px-5 py-3">{{ t.nama_tahun_ajaran }}</td>
+          <td class="px-5 py-3 text-right">
+            <form method="post" action="/superadmin/tahun-ajaran/{{ t.id }}/hapus" onsubmit="return confirm('Hapus tahun ajaran ini?')">
+              <button class="text-red-500 hover:underline text-xs">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="px-5 py-8 text-center text-slate-400">Belum ada tahun ajaran.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-5 h-fit">
+    <h2 class="font-semibold text-sm text-ink-900 mb-3">Tambah Tahun Ajaran</h2>
+    <form method="post" action="/superadmin/tahun-ajaran/tambah" class="space-y-3">
+      <input type="text" name="nama_tahun_ajaran" required placeholder="Contoh: 2024/2025 Ganjil"
+             class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

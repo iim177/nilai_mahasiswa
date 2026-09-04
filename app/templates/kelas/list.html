@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Kelas{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between flex-wrap gap-3">
+  <div>
+    <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">{{ 'Akademik' if user.role=='superadmin' else 'Dosen' }}</p>
+    <h1 class="font-display text-2xl text-ink-900 mt-1">{{ 'Semua Kelas' if user.role=='superadmin' else 'Kelas Saya' }}</h1>
+  </div>
+  {% if user.role == 'superadmin' %}
+  <button x-data @click="$refs.formTambah.classList.toggle('hidden')"
+          class="bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg px-4 py-2.5">+ Buat Kelas</button>
+  {% endif %}
+</div>
+
+{% if user.role == 'superadmin' %}
+<div x-ref="formTambah" class="hidden bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold text-sm text-ink-900 mb-3">Kelas Baru</h2>
+  {% if not makul_list or not ta_list or not dosen_list %}
+  <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+    Pastikan sudah ada minimal 1 Mata Kuliah, 1 Tahun Ajaran, dan 1 akun Dosen sebelum membuat kelas.
+  </p>
+  {% else %}
+  <form method="post" action="/kelas/tambah" class="grid md:grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Nama Kelas</label>
+      <input type="text" name="nama_kelas" required placeholder="Contoh: A / Reguler Pagi"
+             class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Mata Kuliah</label>
+      <select name="mata_kuliah_id" required class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        {% for m in makul_list %}<option value="{{ m.id }}">{{ m.nama_makul }} ({{ m.prodi.nama_prodi }})</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Tahun Ajaran</label>
+      <select name="tahun_ajaran_id" required class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        {% for t in ta_list %}<option value="{{ t.id }}">{{ t.nama_tahun_ajaran }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Dosen Pengampu</label>
+      <select name="dosen_id" required class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        {% for d in dosen_list %}<option value="{{ d.id }}">{{ d.nama_lengkap }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="md:col-span-2">
+      <button class="bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg px-5 py-2.5">Simpan Kelas</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- FILTER PENCARIAN -->
+<form method="get" action="/kelas" id="filterForm" class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+  <p class="text-xs font-medium text-slate-500 mb-3">Cari Kelas</p>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Fakultas</label>
+      <select name="fakultas_id" onchange="document.getElementById('f_prodi').value=''; document.getElementById('f_makul').value=''; document.getElementById('filterForm').submit()"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <option value="">Semua Fakultas</option>
+        {% for f in fakultas_list %}
+        <option value="{{ f.id }}" {{ 'selected' if f_fakultas_id==f.id }}>{{ f.nama_fakultas }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Program Studi</label>
+      <select id="f_prodi" name="prodi_id" onchange="document.getElementById('f_makul').value=''; document.getElementById('filterForm').submit()"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <option value="">Semua Prodi</option>
+        {% for p in prodi_list_filter %}
+        <option value="{{ p.id }}" {{ 'selected' if f_prodi_id==p.id }}>{{ p.nama_prodi }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Mata Kuliah</label>
+      <select id="f_makul" name="mata_kuliah_id" onchange="document.getElementById('filterForm').submit()"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <option value="">Semua Mata Kuliah</option>
+        {% for m in makul_list_filter %}
+        <option value="{{ m.id }}" {{ 'selected' if f_mata_kuliah_id==m.id }}>{{ m.nama_makul }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Tahun Ajaran</label>
+      <select name="tahun_ajaran_id" onchange="document.getElementById('filterForm').submit()"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <option value="">Semua Tahun Ajaran</option>
+        {% for t in ta_list_filter %}
+        <option value="{{ t.id }}" {{ 'selected' if f_tahun_ajaran_id==t.id }}>{{ t.nama_tahun_ajaran }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end">
+      {% if f_fakultas_id or f_prodi_id or f_mata_kuliah_id or f_tahun_ajaran_id %}
+      <a href="/kelas" class="w-full text-center text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-3 py-2 text-ink-900">Reset Filter</a>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+<div class="grid md:grid-cols-2 gap-4">
+  {% for k in data %}
+  <div class="bg-white rounded-xl border border-slate-200 p-5 hover:border-amber-400 hover:shadow-sm transition">
+    <a href="/kelas/{{ k.id }}" class="block">
+      <p class="font-semibold text-ink-900">{{ k.mata_kuliah.nama_makul }}</p>
+      <p class="text-sm text-slate-500 mt-0.5">Kelas {{ k.nama_kelas }} &middot; {{ k.tahun_ajaran.nama_tahun_ajaran }}</p>
+      <p class="text-xs text-slate-400 mt-2">Dosen: {{ k.dosen.nama_lengkap if k.dosen else '-' }}</p>
+    </a>
+    {% if user.role == 'superadmin' %}
+    <form method="post" action="/kelas/{{ k.id }}/hapus" onsubmit="return confirm('Hapus kelas ini beserta seluruh nilai di dalamnya?')" class="mt-3 pt-3 border-t border-slate-100">
+      <button class="text-red-500 hover:underline text-xs">Hapus Kelas</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="md:col-span-2 bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-400 text-sm">
+    Belum ada kelas.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

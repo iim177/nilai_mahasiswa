@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Fakultas{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Superadmin</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Fakultas</h1>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+        <tr><th class="text-left px-5 py-3">Nama Fakultas</th><th class="w-20"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for f in data %}
+        <tr>
+          <td class="px-5 py-3">{{ f.nama_fakultas }}</td>
+          <td class="px-5 py-3 text-right">
+            <form method="post" action="/superadmin/fakultas/{{ f.id }}/hapus" onsubmit="return confirm('Hapus fakultas ini? Semua prodi & mata kuliah di dalamnya juga akan terhapus.')">
+              <button class="text-red-500 hover:underline text-xs">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="px-5 py-8 text-center text-slate-400">Belum ada data fakultas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-5 h-fit">
+    <h2 class="font-semibold text-sm text-ink-900 mb-3">Tambah Fakultas</h2>
+    <form method="post" action="/superadmin/fakultas/tambah" class="space-y-3">
+      <input type="text" name="nama_fakultas" required placeholder="Contoh: Fakultas Teknik"
+             class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+      <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

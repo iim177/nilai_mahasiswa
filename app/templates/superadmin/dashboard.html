@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="mb-8">
+  <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Superadmin</p>
+  <h1 class="font-display text-2xl text-ink-900 mt-1">Selamat datang, {{ user.nama_lengkap.split(' ')[0] }}</h1>
+  <p class="text-slate-500 text-sm mt-1">Ringkasan data akademik saat ini.</p>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+  {% for label, val, href in [
+    ('Fakultas', stats.fakultas, '/superadmin/fakultas'),
+    ('Program Studi', stats.prodi, '/superadmin/prodi'),
+    ('Mata Kuliah', stats.makul, '/superadmin/matakuliah'),
+    ('Kelas Aktif', stats.kelas, '/kelas'),
+    ('Dosen', stats.dosen, '/superadmin/dosen'),
+    ('Mahasiswa', stats.mahasiswa, '/mahasiswa'),
+  ] %}
+  <a href="{{ href }}" class="block bg-white rounded-xl border border-slate-200 p-5 hover:border-amber-400 hover:shadow-sm transition">
+    <p class="text-3xl font-display text-ink-900">{{ val }}</p>
+    <p class="text-sm text-slate-500 mt-1">{{ label }}</p>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 p-6">
+  <h2 class="font-semibold text-ink-900 mb-3">Alur cepat memulai</h2>
+  <ol class="text-sm text-slate-600 space-y-2 list-decimal list-inside">
+    <li>Buat <b>Fakultas</b> &rarr; <b>Program Studi</b> &rarr; <b>Mata Kuliah</b>.</li>
+    <li>Buat <b>Tahun Ajaran</b> (contoh: 2024/2025 Ganjil).</li>
+    <li>Tambahkan akun <b>Dosen</b> di menu Akun Dosen.</li>
+    <li>Buat <b>Kelas</b> (gabungan Mata Kuliah + Tahun Ajaran + Dosen).</li>
+    <li>Import atau tambah <b>Data Mahasiswa</b>, lalu masukkan ke kelas terkait.</li>
+    <li>Input nilai & cetak transkrip dari halaman detail Kelas.</li>
+  </ol>
+</div>
+{% endblock %}

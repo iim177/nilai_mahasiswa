@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Masuk{% endblock %}
+{% block content_noauth %}
+<div class="min-h-screen flex items-center justify-center bg-ink-900 px-4"
+     style="background-image: radial-gradient(circle at 20% 20%, rgba(217,142,44,0.12), transparent 45%), radial-gradient(circle at 80% 80%, rgba(217,142,44,0.08), transparent 40%);">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <p class="font-display text-3xl text-white tracking-tight">SINDO</p>
+      <p class="text-sm text-slate-400 mt-1">Sistem Input Nilai Dosen</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <h1 class="text-lg font-semibold text-ink-900 mb-1">Masuk ke akun</h1>
+      <p class="text-sm text-slate-500 mb-6">Gunakan username & password yang diberikan Superadmin.</p>
+
+      {% if error %}
+      <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+          <input type="text" name="username" required autofocus
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <input type="password" name="password" required
+                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        </div>
+        <button type="submit"
+                class="w-full bg-ink-900 hover:bg-ink-800 text-white font-medium rounded-lg py-2.5 text-sm transition">
+          Masuk
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
