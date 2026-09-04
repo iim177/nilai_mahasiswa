@@ -4,6 +4,7 @@ Semua file lain akan "meminjam" koneksi dari sini lewat fungsi get_db().
 """
 
 import os
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -17,8 +18,13 @@ DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "nilai_mahasiswa")
 
+# PENTING: username/password di-"encode" dulu (quote_plus) supaya karakter
+# spesial (@, :, /, #, dll) di dalamnya tidak bikin URL koneksi rusak/salah baca.
+DB_USER_ENCODED = quote_plus(DB_USER)
+DB_PASSWORD_ENCODED = quote_plus(DB_PASSWORD)
+
 # Menyusun "alamat" koneksi database MySQL
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"mysql+pymysql://{DB_USER_ENCODED}:{DB_PASSWORD_ENCODED}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # engine = objek yang benar-benar terhubung ke MySQL
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
