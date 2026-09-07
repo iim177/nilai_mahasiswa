@@ -15,6 +15,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app import models, auth as auth_utils
 from app.utils import excel_helper
+from app.routers.kelas import _to_int
 
 router = APIRouter(prefix="/mahasiswa")
 templates = Jinja2Templates(directory="app/templates")
@@ -36,7 +37,6 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
     kelas_accessible = _kelas_yang_bisa_diakses(user, db)
     kelas_accessible_ids = {k.id for k in kelas_accessible}
 
-    # Kalau kelas_id yang diminta bukan kelas yang boleh diakses user ini, abaikan (biar tidak "bocor" data)
     if kelas_id and kelas_id not in kelas_accessible_ids:
         kelas_id = None
 
@@ -68,7 +68,6 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
 
     data = query.order_by(models.Mahasiswa.nama).all()
 
-    # ---- Opsi dropdown Fakultas & Prodi, diambil dari kelas yang bisa diakses user ini ----
     fakultas_map, prodi_map = {}, {}
     for k in kelas_accessible:
         prodi_map[k.mata_kuliah.prodi.id] = k.mata_kuliah.prodi
@@ -85,7 +84,6 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
         kelas_list_filter = [k for k in kelas_list_filter if k.mata_kuliah.prodi.fakultas_id == fakultas_id]
     kelas_list_filter = sorted(kelas_list_filter, key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas))
 
-    # ---- Kelas yang diikuti tiap mahasiswa yang tampil (buat kolom "Kelas" di tabel) ----
     kelas_per_mahasiswa = {}
     if data:
         mhs_ids_tampil = [m.id for m in data]
@@ -96,7 +94,6 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
             .all()
         )
         for km in km_list:
-            # Dosen cuma boleh lihat badge kelas yang dia ampu sendiri (bukan kelas dosen lain)
             if user.role == "dosen" and km.kelas_id not in kelas_accessible_ids:
                 continue
             kelas_per_mahasiswa.setdefault(km.mahasiswa_id, []).append(km.kelas)
@@ -113,12 +110,16 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
 def list_mahasiswa(
     request: Request,
     q: str = None,
-    fakultas_id: int = None,
-    prodi_id: int = None,
-    kelas_id: int = None,
+    fakultas_id: str = None,
+    prodi_id: str = None,
+    kelas_id: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
+    fakultas_id = _to_int(fakultas_id)
+    prodi_id = _to_int(prodi_id)
+    kelas_id = _to_int(kelas_id)
+
     ctx = _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan=None)
     return templates.TemplateResponse("mahasiswa/list.html", ctx)
 
@@ -171,7 +172,7 @@ async def import_excel(
 
     jumlah_baru = 0
     jumlah_lewat = 0
-    npm_sudah_diproses = set()  # cegah duplikat NPM di dalam file Excel yang sama
+    npm_sudah_diproses = set()
     for b in baris:
         if b["npm"] in npm_sudah_diproses:
             jumlah_lewat += 1

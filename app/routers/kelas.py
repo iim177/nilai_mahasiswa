@@ -1,8 +1,8 @@
 """
 Route untuk KELAS (dipakai bareng oleh Superadmin & Dosen):
-- List kelas (superadmin lihat semua, dosen lihat kelas dia saja)
+- List kelas (superadmin lihat semua, dosen lihat kelas dia saja) + filter & search
 - Buat kelas baru (khusus superadmin, karena harus tunjuk dosen)
-- Detail kelas: assign mahasiswa, input nilai, edit bobot
+- Detail kelas: assign mahasiswa, input nilai, bobot, nilai harian (tugas/kuis)
 - Export transkrip (PDF & Excel)
 """
 
@@ -17,6 +17,18 @@ from app.utils import pdf_helper, excel_helper
 
 router = APIRouter(prefix="/kelas")
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _to_int(value):
+    """Ubah teks dari query parameter jadi angka, atau None kalau kosong/tidak valid.
+    Dipakai karena dropdown filter yang tidak dipilih ("Semua ...") mengirim string
+    kosong (""), dan FastAPI tidak bisa otomatis mengubah "" jadi int."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 def get_kelas_atau_403(kelas_id: int, user, db: Session):
@@ -38,13 +50,18 @@ def get_kelas_atau_403(kelas_id: int, user, db: Session):
 @router.get("")
 def list_kelas(
     request: Request,
-    fakultas_id: int = None,
-    prodi_id: int = None,
-    mata_kuliah_id: int = None,
-    tahun_ajaran_id: int = None,
+    fakultas_id: str = None,
+    prodi_id: str = None,
+    mata_kuliah_id: str = None,
+    tahun_ajaran_id: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
+    fakultas_id = _to_int(fakultas_id)
+    prodi_id = _to_int(prodi_id)
+    mata_kuliah_id = _to_int(mata_kuliah_id)
+    tahun_ajaran_id = _to_int(tahun_ajaran_id)
+
     q = db.query(models.Kelas).options(
         joinedload(models.Kelas.mata_kuliah).joinedload(models.MataKuliah.prodi).joinedload(models.Prodi.fakultas),
         joinedload(models.Kelas.tahun_ajaran),
@@ -152,13 +169,11 @@ def detail_kelas(
     item_tugas = [i for i in kelas.item_nilai_list if i.jenis == "tugas"]
     item_kuis = [i for i in kelas.item_nilai_list if i.jenis == "kuis"]
 
-    # Peta cepat: {(item_id, km_id): nilai} biar gampang diambil pas render tabel
     peta_nilai_harian = {}
     for km in anggota:
         for ni in km.nilai_harian:
             peta_nilai_harian[(ni.item_nilai_id, km.id)] = ni.nilai
 
-    # Mahasiswa yang BELUM ada di kelas ini (buat dropdown assign)
     id_terdaftar = [a.mahasiswa_id for a in anggota]
     q_belum = db.query(models.Mahasiswa)
     if id_terdaftar:
@@ -225,10 +240,6 @@ async def simpan_nilai_harian(
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
-    """
-    Menyimpan nilai spreadsheet Tugas Harian atau Kuis sekaligus.
-    Nama field di form berformat: nilai_<item_id>_<km_id>
-    """
     kelas = get_kelas_atau_403(kelas_id, user, db)
     if not kelas:
         return RedirectResponse("/kelas", status_code=303)
@@ -266,6 +277,7 @@ async def simpan_nilai_harian(
     return RedirectResponse(f"/kelas/{kelas_id}#{jenis}", status_code=303)
 
 
+# ---------------------------------------------------------------- BOBOT & TOGGLE
 @router.post("/{kelas_id}/bobot")
 def update_bobot(
     kelas_id: int,
@@ -283,7 +295,6 @@ def update_bobot(
 
     total = bobot_tugas + bobot_kuis + bobot_uts + bobot_uas
     if abs(total - 100) > 0.01:
-        # Total bobot harus 100%, kalau tidak, tolak dan kembali ke halaman detail dengan pesan error
         return RedirectResponse(f"/kelas/{kelas_id}?error_bobot=Total+bobot+harus+100%25,+saat+ini+{total:.1f}%25", status_code=303)
 
     kelas.bobot_tugas = bobot_tugas
@@ -307,6 +318,7 @@ def toggle_bobot(
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
 
 
+# ---------------------------------------------------------------- ASSIGN MAHASISWA
 @router.post("/{kelas_id}/assign")
 def assign_mahasiswa(
     kelas_id: int,
@@ -343,6 +355,7 @@ def keluarkan_mahasiswa(
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
 
 
+# ---------------------------------------------------------------- NILAI UTS/UAS + OVERRIDE TUGAS/KUIS
 @router.post("/{kelas_id}/nilai/simpan-semua")
 async def simpan_semua_nilai(
     kelas_id: int,
@@ -368,7 +381,7 @@ async def simpan_semua_nilai(
             nilai = float(v)
         except ValueError:
             return None
-        return max(0, min(100, nilai))  # nilai dibatasi 0-100
+        return max(0, min(100, nilai))
 
     form_data = await request.form()
     anggota = db.query(models.KelasMahasiswa).filter(models.KelasMahasiswa.kelas_id == kelas_id).all()
