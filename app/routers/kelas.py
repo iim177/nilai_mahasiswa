@@ -1,6 +1,6 @@
 """
 Route untuk KELAS (dipakai bareng oleh Superadmin & Dosen):
-- List kelas (superadmin lihat semua, dosen lihat kelas dia saja) + filter & search
+- List kelas (superadmin lihat semua, dosen lihat kelas dia saja, hanya Tahun Ajaran aktif) + filter & search
 - Buat kelas baru (khusus superadmin, karena harus tunjuk dosen)
 - Detail kelas: assign mahasiswa, input nilai, bobot, nilai harian (tugas/kuis)
 - Export transkrip (PDF & Excel)
@@ -20,9 +20,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 def _to_int(value):
-    """Ubah teks dari query parameter jadi angka, atau None kalau kosong/tidak valid.
-    Dipakai karena dropdown filter yang tidak dipilih ("Semua ...") mengirim string
-    kosong (""), dan FastAPI tidak bisa otomatis mengubah "" jadi int."""
+    """Ubah teks dari query parameter jadi angka, atau None kalau kosong/tidak valid."""
     if value is None or value == "":
         return None
     try:
@@ -32,17 +30,29 @@ def _to_int(value):
 
 
 def get_kelas_atau_403(kelas_id: int, user, db: Session):
-    """Ambil kelas, pastikan dosen hanya boleh akses kelas yang dia ampu."""
+    """
+    Ambil kelas, pastikan dosen hanya boleh akses kelas yang dia ampu,
+    DAN hanya kalau Tahun Ajaran kelas itu masih aktif (dosen tidak bisa
+    akses kelas dari tahun nonaktif sama sekali, walau tahu URL-nya).
+    Superadmin selalu bisa akses kelas manapun, aktif atau tidak.
+    """
     kelas = (
         db.query(models.Kelas)
-        .options(joinedload(models.Kelas.mata_kuliah), joinedload(models.Kelas.tahun_ajaran), joinedload(models.Kelas.dosen))
+        .options(
+            joinedload(models.Kelas.mata_kuliah),
+            joinedload(models.Kelas.tahun_ajaran),
+            joinedload(models.Kelas.dosen),
+        )
         .filter(models.Kelas.id == kelas_id)
         .first()
     )
     if not kelas:
         return None
-    if user.role == "dosen" and kelas.dosen_id != user.id:
-        return None
+    if user.role == "dosen":
+        if kelas.dosen_id != user.id:
+            return None
+        if not kelas.tahun_ajaran.is_active:
+            return None
     return kelas
 
 
@@ -54,6 +64,7 @@ def list_kelas(
     prodi_id: str = None,
     mata_kuliah_id: str = None,
     tahun_ajaran_id: str = None,
+    hanya_aktif: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
@@ -61,14 +72,23 @@ def list_kelas(
     prodi_id = _to_int(prodi_id)
     mata_kuliah_id = _to_int(mata_kuliah_id)
     tahun_ajaran_id = _to_int(tahun_ajaran_id)
+    hanya_aktif_bool = bool(hanya_aktif)  # checkbox: ada nilai apapun = dicentang
 
     q = db.query(models.Kelas).options(
         joinedload(models.Kelas.mata_kuliah).joinedload(models.MataKuliah.prodi).joinedload(models.Prodi.fakultas),
         joinedload(models.Kelas.tahun_ajaran),
         joinedload(models.Kelas.dosen),
     )
+
     if user.role == "dosen":
+        # Dosen: kelasnya sendiri, DAN cuma dari Tahun Ajaran yang aktif
         q = q.filter(models.Kelas.dosen_id == user.id)
+        q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
+        q = q.filter(models.TahunAjaran.is_active == True)
+    elif hanya_aktif_bool:
+        # Superadmin dengan checkbox "hanya tampilkan tahun aktif" dicentang
+        q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
+        q = q.filter(models.TahunAjaran.is_active == True)
 
     # ---- Filter pencarian (Fakultas -> Prodi -> Mata Kuliah, + Tahun Ajaran) ----
     if tahun_ajaran_id:
@@ -76,20 +96,20 @@ def list_kelas(
     if mata_kuliah_id:
         q = q.filter(models.Kelas.mata_kuliah_id == mata_kuliah_id)
     elif prodi_id:
-        q = q.join(models.MataKuliah).filter(models.MataKuliah.prodi_id == prodi_id)
+        q = q.join(models.MataKuliah, models.Kelas.mata_kuliah_id == models.MataKuliah.id).filter(models.MataKuliah.prodi_id == prodi_id)
     elif fakultas_id:
-        q = q.join(models.MataKuliah).join(models.Prodi).filter(models.Prodi.fakultas_id == fakultas_id)
+        q = q.join(models.MataKuliah, models.Kelas.mata_kuliah_id == models.MataKuliah.id).join(models.Prodi).filter(models.Prodi.fakultas_id == fakultas_id)
 
     data = q.order_by(models.Kelas.id.desc()).all()
 
-    # Data untuk form "buat kelas baru" (khusus superadmin)
+    # Data untuk form "buat kelas baru" (khusus superadmin) - tetap semua Tahun Ajaran, aktif/tidak
     makul_list, ta_list, dosen_list = [], [], []
     if user.role == "superadmin":
         makul_list = db.query(models.MataKuliah).order_by(models.MataKuliah.nama_makul).all()
         ta_list = db.query(models.TahunAjaran).order_by(models.TahunAjaran.id.desc()).all()
         dosen_list = db.query(models.User).filter(models.User.role == "dosen").order_by(models.User.nama_lengkap).all()
 
-    # Data untuk dropdown FILTER (selalu tampil semua master data, terlepas dari role)
+    # Data untuk dropdown FILTER
     fakultas_list = db.query(models.Fakultas).order_by(models.Fakultas.nama_fakultas).all()
     prodi_list_filter = db.query(models.Prodi).order_by(models.Prodi.nama_prodi).all()
     if fakultas_id:
@@ -100,7 +120,11 @@ def list_kelas(
     elif fakultas_id:
         prodi_id_terkait = [p.id for p in prodi_list_filter]
         makul_list_filter = [m for m in makul_list_filter if m.prodi_id in prodi_id_terkait]
+
+    # Dropdown Tahun Ajaran: dosen cuma lihat yang aktif; superadmin lihat semua (dikasih label Nonaktif)
     ta_list_filter = db.query(models.TahunAjaran).order_by(models.TahunAjaran.id.desc()).all()
+    if user.role == "dosen":
+        ta_list_filter = [t for t in ta_list_filter if t.is_active]
 
     return templates.TemplateResponse(
         "kelas/list.html",
@@ -111,6 +135,7 @@ def list_kelas(
             "makul_list_filter": makul_list_filter, "ta_list_filter": ta_list_filter,
             "f_fakultas_id": fakultas_id, "f_prodi_id": prodi_id,
             "f_mata_kuliah_id": mata_kuliah_id, "f_tahun_ajaran_id": tahun_ajaran_id,
+            "hanya_aktif": hanya_aktif_bool,
         },
     )
 
@@ -309,7 +334,6 @@ def update_bobot(
 def toggle_bobot(
     kelas_id: int, user=Depends(auth_utils.require_login), db: Session = Depends(get_db)
 ):
-    """Nyalakan/matikan pemakaian bobot & Nilai Akhir untuk kelas ini."""
     kelas = get_kelas_atau_403(kelas_id, user, db)
     if not kelas:
         return RedirectResponse("/kelas", status_code=303)
@@ -363,10 +387,6 @@ async def simpan_semua_nilai(
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
-    """
-    Menyimpan nilai SEMUA mahasiswa di kelas sekaligus (dari satu form besar di halaman detail kelas).
-    Nama field di form berformat: tugas_<km_id>, kuis_<km_id>, uts_<km_id>, uas_<km_id>
-    """
     kelas = get_kelas_atau_403(kelas_id, user, db)
     if not kelas:
         return RedirectResponse("/kelas", status_code=303)

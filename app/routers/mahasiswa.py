@@ -22,13 +22,16 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 def _kelas_yang_bisa_diakses(user, db: Session):
-    """Daftar Kelas yang boleh dipakai sebagai filter, sesuai role: superadmin semua, dosen kelasnya sendiri."""
+    """Daftar Kelas yang boleh dipakai sebagai filter, sesuai role: superadmin semua,
+    dosen kelasnya sendiri DAN cuma dari Tahun Ajaran yang masih aktif."""
     q = db.query(models.Kelas).options(
         joinedload(models.Kelas.mata_kuliah).joinedload(models.MataKuliah.prodi).joinedload(models.Prodi.fakultas),
         joinedload(models.Kelas.tahun_ajaran),
     )
     if user.role == "dosen":
         q = q.filter(models.Kelas.dosen_id == user.id)
+        q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
+        q = q.filter(models.TahunAjaran.is_active == True)
     return q.all()
 
 

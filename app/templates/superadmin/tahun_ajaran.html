@@ -4,26 +4,41 @@
 <div class="mb-6">
   <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Superadmin</p>
   <h1 class="font-display text-2xl text-ink-900 mt-1">Tahun Ajaran</h1>
+  <p class="text-slate-500 text-sm mt-1">Tahun Ajaran nonaktif otomatis tersembunyi dari menu Kelas milik Dosen.</p>
 </div>
 
 <div class="grid md:grid-cols-3 gap-6">
   <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
     <table class="w-full text-sm">
       <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-        <tr><th class="text-left px-5 py-3">Tahun Ajaran</th><th class="w-20"></th></tr>
+        <tr>
+          <th class="text-left px-5 py-3">Tahun Ajaran</th>
+          <th class="text-left px-5 py-3">Status</th>
+          <th class="w-32"></th>
+        </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
         {% for t in data %}
         <tr>
           <td class="px-5 py-3">{{ t.nama_tahun_ajaran }}</td>
-          <td class="px-5 py-3 text-right">
-            <form method="post" action="/superadmin/tahun-ajaran/{{ t.id }}/hapus" onsubmit="return confirm('Hapus tahun ajaran ini?')">
+          <td class="px-5 py-3">
+            {% if t.is_active %}
+            <span class="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs">Aktif</span>
+            {% else %}
+            <span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs">Nonaktif</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right whitespace-nowrap">
+            <form method="post" action="/superadmin/tahun-ajaran/{{ t.id }}/toggle-aktif" class="inline">
+              <button class="text-amber-600 hover:underline text-xs mr-3">{{ 'Nonaktifkan' if t.is_active else 'Aktifkan' }}</button>
+            </form>
+            <form method="post" action="/superadmin/tahun-ajaran/{{ t.id }}/hapus" class="inline" onsubmit="return confirm('Hapus tahun ajaran ini? Semua kelas di dalamnya juga akan terhapus.')">
               <button class="text-red-500 hover:underline text-xs">Hapus</button>
             </form>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="2" class="px-5 py-8 text-center text-slate-400">Belum ada tahun ajaran.</td></tr>
+        <tr><td colspan="3" class="px-5 py-8 text-center text-slate-400">Belum ada tahun ajaran.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -34,7 +49,7 @@
     <form method="post" action="/superadmin/tahun-ajaran/tambah" class="space-y-3">
       <input type="text" name="nama_tahun_ajaran" required placeholder="Contoh: 2024/2025 Ganjil"
              class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-      <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan</button>
+      <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Simpan (langsung aktif)</button>
     </form>
   </div>
 </div>

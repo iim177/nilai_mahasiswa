@@ -166,6 +166,18 @@ def hapus_tahun_ajaran(
     return RedirectResponse("/superadmin/tahun-ajaran", status_code=303)
 
 
+@router.post("/tahun-ajaran/{ta_id}/toggle-aktif")
+def toggle_aktif_tahun_ajaran(
+    ta_id: int, user=Depends(auth_utils.require_superadmin), db: Session = Depends(get_db)
+):
+    """Nyalakan/matikan status aktif Tahun Ajaran ini. Kelas di tahun nonaktif jadi tersembunyi dari dosen."""
+    ta = db.query(models.TahunAjaran).filter(models.TahunAjaran.id == ta_id).first()
+    if ta:
+        ta.is_active = not ta.is_active
+        db.commit()
+    return RedirectResponse("/superadmin/tahun-ajaran", status_code=303)
+
+
 # ---------------------------------------------------------------- DOSEN (USER MANAGEMENT)
 @router.get("/dosen")
 def list_dosen(request: Request, user=Depends(auth_utils.require_superadmin), db: Session = Depends(get_db)):
