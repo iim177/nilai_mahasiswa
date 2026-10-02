@@ -4,7 +4,7 @@
 <div class="mb-6">
   <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Akademik</p>
   <h1 class="font-display text-2xl text-ink-900 mt-1">Data Mahasiswa</h1>
-  <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign ke kelas dilakukan dari halaman detail Kelas.</p>
+  <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign/keluarkan/pindah kelas dilakukan dari halaman detail Kelas.</p>
 </div>
 
 {% if pesan %}
@@ -70,7 +70,9 @@
           <th class="text-left px-5 py-3">NPM</th>
           <th class="text-left px-5 py-3">Nama</th>
           <th class="text-left px-5 py-3">Kelas</th>
+          {% if user.role == 'superadmin' %}
           <th class="w-20"></th>
+          {% endif %}
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
@@ -90,14 +92,16 @@
             <span class="text-slate-300 text-xs">Belum ada kelas</span>
             {% endif %}
           </td>
+          {% if user.role == 'superadmin' %}
           <td class="px-5 py-3 text-right whitespace-nowrap">
-            <form method="post" action="/mahasiswa/{{ m.id }}/hapus" onsubmit="return confirm('Hapus mahasiswa ini? Dia juga akan hilang dari semua kelas.')">
+            <form method="post" action="/mahasiswa/{{ m.id }}/hapus" onsubmit="return confirm('Hapus mahasiswa ini secara permanen? Dia akan hilang dari semua kelas dan tidak bisa dikembalikan.')">
               <button class="text-red-500 hover:underline text-xs">Hapus</button>
             </form>
           </td>
+          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="4" class="px-5 py-8 text-center text-slate-400">
+        <tr><td colspan="{{ 4 if user.role == 'superadmin' else 3 }}" class="px-5 py-8 text-center text-slate-400">
           {% if q or f_fakultas_id or f_prodi_id or f_kelas_id %}Tidak ada mahasiswa yang cocok dengan filter/pencarian ini.{% else %}Belum ada data mahasiswa.{% endif %}
         </td></tr>
         {% endfor %}

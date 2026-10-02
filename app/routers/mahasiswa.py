@@ -2,6 +2,7 @@
 Route untuk data MAHASISWA (general, belum terikat kelas):
 - List semua mahasiswa, dengan filter (Fakultas/Prodi/Kelas) & search (nama/NPM)
 - Tambah manual
+- Hapus mahasiswa PERMANEN (khusus Superadmin - dosen tidak boleh)
 - Import dari Excel (Nama + NPM)
 - Download template Excel
 """
@@ -142,7 +143,8 @@ def tambah_mahasiswa(
 
 
 @router.post("/{mhs_id}/hapus")
-def hapus_mahasiswa(mhs_id: int, user=Depends(auth_utils.require_login), db: Session = Depends(get_db)):
+def hapus_mahasiswa(mhs_id: int, user=Depends(auth_utils.require_superadmin), db: Session = Depends(get_db)):
+    """Hapus mahasiswa PERMANEN dari sistem (hilang dari semua kelas). Khusus Superadmin."""
     m = db.query(models.Mahasiswa).filter(models.Mahasiswa.id == mhs_id).first()
     if m:
         db.delete(m)

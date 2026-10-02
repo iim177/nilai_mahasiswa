@@ -2,7 +2,7 @@
 Route untuk KELAS (dipakai bareng oleh Superadmin & Dosen):
 - List kelas (superadmin lihat semua, dosen lihat kelas dia saja, hanya Tahun Ajaran aktif) + filter & search
 - Buat kelas baru (khusus superadmin, karena harus tunjuk dosen)
-- Detail kelas: assign mahasiswa, input nilai, bobot, nilai harian (tugas/kuis)
+- Detail kelas: assign mahasiswa, keluarkan, pindah kelas, input nilai, bobot, nilai harian (tugas/kuis)
 - Export transkrip (PDF & Excel)
 """
 
@@ -54,6 +54,23 @@ def get_kelas_atau_403(kelas_id: int, user, db: Session):
         if not kelas.tahun_ajaran.is_active:
             return None
     return kelas
+
+
+def _daftar_kelas_tujuan_pindah(user, db: Session, kecuali_kelas_id: int):
+    """
+    Daftar kelas yang boleh jadi TUJUAN pindah, sesuai role:
+    - Superadmin: semua kelas lain (aktif maupun tidak)
+    - Dosen: kelas lain milik dia sendiri yang masih aktif
+    Kelas yang sedang dibuka (kecuali_kelas_id) tidak ikut ditawarkan.
+    """
+    q = db.query(models.Kelas).options(
+        joinedload(models.Kelas.mata_kuliah), joinedload(models.Kelas.tahun_ajaran)
+    ).filter(models.Kelas.id != kecuali_kelas_id)
+    if user.role == "dosen":
+        q = q.filter(models.Kelas.dosen_id == user.id)
+        q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
+        q = q.filter(models.TahunAjaran.is_active == True)
+    return q.order_by(models.Kelas.id.desc()).all()
 
 
 # ---------------------------------------------------------------- LIST KELAS
@@ -205,6 +222,8 @@ def detail_kelas(
         q_belum = q_belum.filter(~models.Mahasiswa.id.in_(id_terdaftar))
     mahasiswa_belum_terdaftar = q_belum.order_by(models.Mahasiswa.nama).all()
 
+    kelas_tujuan_list = _daftar_kelas_tujuan_pindah(user, db, kelas_id)
+
     return templates.TemplateResponse(
         "kelas/detail.html",
         {
@@ -213,6 +232,7 @@ def detail_kelas(
             "item_tugas": item_tugas, "item_kuis": item_kuis,
             "peta_nilai_harian": peta_nilai_harian,
             "error_bobot": error_bobot,
+            "kelas_tujuan_list": kelas_tujuan_list,
         },
     )
 
@@ -342,7 +362,7 @@ def toggle_bobot(
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
 
 
-# ---------------------------------------------------------------- ASSIGN MAHASISWA
+# ---------------------------------------------------------------- ASSIGN / KELUARKAN / PINDAH MAHASISWA
 @router.post("/{kelas_id}/assign")
 def assign_mahasiswa(
     kelas_id: int,
@@ -376,6 +396,53 @@ def keluarkan_mahasiswa(
     if km and km.kelas_id == kelas_id:
         db.delete(km)
         db.commit()
+    return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+
+
+@router.post("/{kelas_id}/pindah/{km_id}")
+def pindah_kelas(
+    kelas_id: int,
+    km_id: int,
+    kelas_tujuan_id: int = Form(...),
+    user=Depends(auth_utils.require_login),
+    db: Session = Depends(get_db),
+):
+    """
+    Memindahkan satu mahasiswa dari kelas ini ke kelas lain.
+    Dosen cuma boleh pindah dari & ke kelas miliknya sendiri (yang aktif).
+    Superadmin boleh pindah ke kelas manapun.
+    Nilai (UTS/UAS/override tugas-kuis/nilai harian) di kelas lama TIDAK ikut
+    terbawa, karena struktur bobot & kolom nilai harian tiap kelas bisa beda.
+    """
+    kelas_asal = get_kelas_atau_403(kelas_id, user, db)
+    if not kelas_asal:
+        return RedirectResponse("/kelas", status_code=303)
+
+    if kelas_tujuan_id == kelas_id:
+        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+
+    kelas_tujuan = get_kelas_atau_403(kelas_tujuan_id, user, db)
+    if not kelas_tujuan:
+        # kelas tujuan tidak ada / tidak boleh diakses user ini -> batalkan
+        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+
+    km = db.query(models.KelasMahasiswa).filter(models.KelasMahasiswa.id == km_id).first()
+    if not km or km.kelas_id != kelas_id:
+        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+
+    sudah_ada_di_tujuan = (
+        db.query(models.KelasMahasiswa)
+        .filter(
+            models.KelasMahasiswa.kelas_id == kelas_tujuan_id,
+            models.KelasMahasiswa.mahasiswa_id == km.mahasiswa_id,
+        )
+        .first()
+    )
+    if not sudah_ada_di_tujuan:
+        db.add(models.KelasMahasiswa(kelas_id=kelas_tujuan_id, mahasiswa_id=km.mahasiswa_id))
+
+    db.delete(km)  # nilai_harian ikut terhapus otomatis (cascade delete-orphan)
+    db.commit()
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
 
 
