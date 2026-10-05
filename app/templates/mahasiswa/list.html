@@ -63,27 +63,27 @@
 </form>
 
 <div class="grid md:grid-cols-3 gap-6">
-  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+  <div class="md:col-span-2 bg-white rounded-xl border border-slate-200 overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
         <tr>
           <th class="text-left px-5 py-3">NPM</th>
           <th class="text-left px-5 py-3">Nama</th>
           <th class="text-left px-5 py-3">Kelas</th>
-          <th class="w-40"></th>
+          <th class="w-44"></th>
         </tr>
       </thead>
       {% for m in data %}
       <tbody x-data="{ open: false }" class="border-t border-slate-100">
         <tr>
           <td class="px-5 py-3 text-slate-500 whitespace-nowrap">{{ m.npm }}</td>
-          <td class="px-5 py-3 whitespace-nowrap">{{ m.nama }}</td>
+          <td class="px-5 py-3">{{ m.nama }}</td>
           <td class="px-5 py-3">
             {% set daftar_km = km_per_mahasiswa.get(m.id, []) %}
             {% if daftar_km %}
             <div class="flex flex-wrap gap-1">
               {% for km in daftar_km %}
-              <a href="/kelas/{{ km.kelas.id }}" class="inline-block bg-slate-100 hover:bg-amber-100 text-slate-600 text-xs rounded-full px-2.5 py-1 whitespace-nowrap">{{ km.kelas.mata_kuliah.nama_makul }} - {{ km.kelas.nama_kelas }}</a>
+              <a href="/kelas/{{ km.kelas.id }}" class="inline-block bg-slate-100 hover:bg-amber-100 text-slate-600 text-xs rounded-lg px-2.5 py-1">{{ km.kelas.mata_kuliah.nama_makul }} - {{ km.kelas.nama_kelas }}</a>
               {% endfor %}
             </div>
             {% else %}
