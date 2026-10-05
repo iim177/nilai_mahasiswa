@@ -4,7 +4,7 @@
 <div class="mb-6">
   <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Akademik</p>
   <h1 class="font-display text-2xl text-ink-900 mt-1">Data Mahasiswa</h1>
-  <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign/keluarkan/pindah kelas dilakukan dari halaman detail Kelas.</p>
+  <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign mahasiswa ke kelas lewat halaman detail Kelas; pindah/keluarkan lewat tombol Atur kelas di tabel ini.</p>
 </div>
 
 {% if pesan %}
@@ -70,42 +70,72 @@
           <th class="text-left px-5 py-3">NPM</th>
           <th class="text-left px-5 py-3">Nama</th>
           <th class="text-left px-5 py-3">Kelas</th>
-          {% if user.role == 'superadmin' %}
-          <th class="w-20"></th>
-          {% endif %}
+          <th class="w-40"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100">
-        {% for m in data %}
+      {% for m in data %}
+      <tbody x-data="{ open: false }" class="border-t border-slate-100">
         <tr>
           <td class="px-5 py-3 text-slate-500 whitespace-nowrap">{{ m.npm }}</td>
           <td class="px-5 py-3 whitespace-nowrap">{{ m.nama }}</td>
           <td class="px-5 py-3">
-            {% set daftar_kelas = kelas_per_mahasiswa.get(m.id, []) %}
-            {% if daftar_kelas %}
+            {% set daftar_km = km_per_mahasiswa.get(m.id, []) %}
+            {% if daftar_km %}
             <div class="flex flex-wrap gap-1">
-              {% for k in daftar_kelas %}
-              <a href="/kelas/{{ k.id }}" class="inline-block bg-slate-100 hover:bg-amber-100 text-slate-600 text-xs rounded-full px-2.5 py-1 whitespace-nowrap">{{ k.mata_kuliah.nama_makul }} - {{ k.nama_kelas }}</a>
+              {% for km in daftar_km %}
+              <a href="/kelas/{{ km.kelas.id }}" class="inline-block bg-slate-100 hover:bg-amber-100 text-slate-600 text-xs rounded-full px-2.5 py-1 whitespace-nowrap">{{ km.kelas.mata_kuliah.nama_makul }} - {{ km.kelas.nama_kelas }}</a>
               {% endfor %}
             </div>
             {% else %}
             <span class="text-slate-300 text-xs">Belum ada kelas</span>
             {% endif %}
           </td>
-          {% if user.role == 'superadmin' %}
           <td class="px-5 py-3 text-right whitespace-nowrap">
-            <form method="post" action="/mahasiswa/{{ m.id }}/hapus" onsubmit="return confirm('Hapus mahasiswa ini secara permanen? Dia akan hilang dari semua kelas dan tidak bisa dikembalikan.')">
+            {% if daftar_km %}
+            <button type="button" @click="open = !open" class="text-amber-600 hover:underline text-xs mr-3" x-text="open ? 'Tutup' : 'Atur kelas'"></button>
+            {% endif %}
+            {% if user.role == 'superadmin' %}
+            <form method="post" action="/mahasiswa/{{ m.id }}/hapus" class="inline" onsubmit="return confirm('Hapus mahasiswa ini secara permanen? Dia akan hilang dari semua kelas dan tidak bisa dikembalikan.')">
               <button class="text-red-500 hover:underline text-xs">Hapus</button>
             </form>
+            {% endif %}
           </td>
-          {% endif %}
         </tr>
-        {% else %}
-        <tr><td colspan="{{ 4 if user.role == 'superadmin' else 3 }}" class="px-5 py-8 text-center text-slate-400">
+        {% if daftar_km %}
+        <tr x-show="open" style="display: none;">
+          <td colspan="4" class="px-5 pb-4 bg-slate-50">
+            {% for km in daftar_km %}
+            <div class="flex items-center justify-between gap-3 flex-wrap pt-3 text-sm">
+              <span class="text-slate-600">{{ km.kelas.mata_kuliah.nama_makul }} - {{ km.kelas.nama_kelas }}</span>
+              <div class="flex items-center gap-3 flex-wrap">
+                <form method="post" action="/kelas/{{ km.kelas_id }}/pindah/{{ km.id }}" class="flex items-center gap-2" onsubmit="return confirm('Pindahkan {{ m.nama }} ke kelas terpilih? Nilainya di kelas ini tidak ikut terbawa.')">
+                  <input type="hidden" name="kembali" value="mahasiswa">
+                  <select name="kelas_tujuan_id" required class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="" disabled selected>Pindah ke kelas...</option>
+                    {% for kt in kelas_tujuan_list if kt.id != km.kelas_id %}
+                    <option value="{{ kt.id }}">{{ kt.mata_kuliah.nama_makul }} - {{ kt.nama_kelas }} ({{ kt.tahun_ajaran.nama_tahun_ajaran }})</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="text-amber-600 hover:underline text-xs whitespace-nowrap">Pindahkan</button>
+                </form>
+                <form method="post" action="/kelas/{{ km.kelas_id }}/keluarkan/{{ km.id }}" onsubmit="return confirm('Keluarkan {{ m.nama }} dari kelas ini? Nilainya di kelas ini akan terhapus.')">
+                  <input type="hidden" name="kembali" value="mahasiswa">
+                  <button class="text-red-500 hover:underline text-xs whitespace-nowrap">Keluarkan</button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+      {% else %}
+      <tbody>
+        <tr><td colspan="4" class="px-5 py-8 text-center text-slate-400">
           {% if q or f_fakultas_id or f_prodi_id or f_kelas_id %}Tidak ada mahasiswa yang cocok dengan filter/pencarian ini.{% else %}Belum ada data mahasiswa.{% endif %}
         </td></tr>
-        {% endfor %}
       </tbody>
+      {% endfor %}
     </table>
   </div>
 

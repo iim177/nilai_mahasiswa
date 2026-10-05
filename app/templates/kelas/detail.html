@@ -175,36 +175,6 @@
   </div>
 </div>
 
-<!-- ANGGOTA KELAS: pindah & keluarkan -->
-{% if anggota %}
-<div class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-  <h2 class="font-semibold text-sm text-ink-900 mb-3">Anggota Kelas ({{ anggota|length }})</h2>
-  <div class="divide-y divide-slate-100">
-    {% for a in anggota %}
-    <div class="flex items-center justify-between py-2.5 text-sm gap-4 flex-wrap">
-      <span>{{ a.mahasiswa.nama }} <span class="text-slate-400">&middot; {{ a.mahasiswa.npm }}</span></span>
-      <div class="flex items-center gap-3 flex-wrap">
-        {% if kelas_tujuan_list %}
-        <form method="post" action="/kelas/{{ kelas.id }}/pindah/{{ a.id }}" onsubmit="return confirm('Pindahkan {{ a.mahasiswa.nama }} ke kelas terpilih? Nilainya di kelas ini tidak ikut terbawa.')" class="flex items-center gap-2">
-          <select name="kelas_tujuan_id" required class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
-            <option value="" disabled selected>Pindah ke kelas...</option>
-            {% for kt in kelas_tujuan_list %}
-            <option value="{{ kt.id }}">{{ kt.mata_kuliah.nama_makul }} - {{ kt.nama_kelas }} ({{ kt.tahun_ajaran.nama_tahun_ajaran }})</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="text-amber-600 hover:underline text-xs whitespace-nowrap">Pindahkan</button>
-        </form>
-        {% endif %}
-        <form method="post" action="/kelas/{{ kelas.id }}/keluarkan/{{ a.id }}" onsubmit="return confirm('Keluarkan mahasiswa ini dari kelas? Nilainya di kelas ini akan terhapus.')">
-          <button class="text-red-500 hover:underline text-xs whitespace-nowrap">Keluarkan</button>
-        </form>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
 <!-- NILAI TUGAS HARIAN -->
 {{ spreadsheet_harian("Nilai Tugas Harian", "tugas", item_tugas, anggota, peta_nilai_harian, kelas.id, "tugas") }}
 

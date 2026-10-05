@@ -385,18 +385,28 @@ def assign_mahasiswa(
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
 
 
+def _redirect_setelah_aksi(kelas_id, kembali: str):
+    """Setelah keluarkan/pindah: balik ke halaman Data Mahasiswa kalau aksinya dari sana."""
+    if kembali == "mahasiswa":
+        return RedirectResponse("/mahasiswa", status_code=303)
+    if kelas_id is None:
+        return RedirectResponse("/kelas", status_code=303)
+    return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+
+
 @router.post("/{kelas_id}/keluarkan/{km_id}")
 def keluarkan_mahasiswa(
-    kelas_id: int, km_id: int, user=Depends(auth_utils.require_login), db: Session = Depends(get_db)
+    kelas_id: int, km_id: int, kembali: str = Form(""),
+    user=Depends(auth_utils.require_login), db: Session = Depends(get_db)
 ):
     kelas = get_kelas_atau_403(kelas_id, user, db)
     if not kelas:
-        return RedirectResponse("/kelas", status_code=303)
+        return _redirect_setelah_aksi(None, kembali)
     km = db.query(models.KelasMahasiswa).filter(models.KelasMahasiswa.id == km_id).first()
     if km and km.kelas_id == kelas_id:
         db.delete(km)
         db.commit()
-    return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+    return _redirect_setelah_aksi(kelas_id, kembali)
 
 
 @router.post("/{kelas_id}/pindah/{km_id}")
@@ -404,46 +414,39 @@ def pindah_kelas(
     kelas_id: int,
     km_id: int,
     kelas_tujuan_id: int = Form(...),
+    kembali: str = Form(""),
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
     """
-    Memindahkan satu mahasiswa dari kelas ini ke kelas lain.
-    Dosen cuma boleh pindah dari & ke kelas miliknya sendiri (yang aktif).
-    Superadmin boleh pindah ke kelas manapun.
-    Nilai (UTS/UAS/override tugas-kuis/nilai harian) di kelas lama TIDAK ikut
-    terbawa, karena struktur bobot & kolom nilai harian tiap kelas bisa beda.
+    Pindahkan satu mahasiswa dari kelas ini ke kelas lain.
+    Dosen cuma boleh dari & ke kelas miliknya yang aktif; superadmin ke kelas manapun.
+    Nilai di kelas lama TIDAK ikut terbawa (struktur bobot & kolom nilai tiap kelas beda).
     """
     kelas_asal = get_kelas_atau_403(kelas_id, user, db)
     if not kelas_asal:
-        return RedirectResponse("/kelas", status_code=303)
-
+        return _redirect_setelah_aksi(None, kembali)
     if kelas_tujuan_id == kelas_id:
-        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
-
+        return _redirect_setelah_aksi(kelas_id, kembali)
     kelas_tujuan = get_kelas_atau_403(kelas_tujuan_id, user, db)
     if not kelas_tujuan:
-        # kelas tujuan tidak ada / tidak boleh diakses user ini -> batalkan
-        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+        return _redirect_setelah_aksi(kelas_id, kembali)
 
     km = db.query(models.KelasMahasiswa).filter(models.KelasMahasiswa.id == km_id).first()
     if not km or km.kelas_id != kelas_id:
-        return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+        return _redirect_setelah_aksi(kelas_id, kembali)
 
     sudah_ada_di_tujuan = (
         db.query(models.KelasMahasiswa)
-        .filter(
-            models.KelasMahasiswa.kelas_id == kelas_tujuan_id,
-            models.KelasMahasiswa.mahasiswa_id == km.mahasiswa_id,
-        )
+        .filter(models.KelasMahasiswa.kelas_id == kelas_tujuan_id,
+                models.KelasMahasiswa.mahasiswa_id == km.mahasiswa_id)
         .first()
     )
     if not sudah_ada_di_tujuan:
         db.add(models.KelasMahasiswa(kelas_id=kelas_tujuan_id, mahasiswa_id=km.mahasiswa_id))
-
-    db.delete(km)  # nilai_harian ikut terhapus otomatis (cascade delete-orphan)
+    db.delete(km)  # nilai_harian ikut terhapus (cascade)
     db.commit()
-    return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+    return _redirect_setelah_aksi(kelas_id, kembali)
 
 
 # ---------------------------------------------------------------- NILAI UTS/UAS + OVERRIDE TUGAS/KUIS

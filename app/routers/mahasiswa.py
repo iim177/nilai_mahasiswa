@@ -88,7 +88,7 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
         kelas_list_filter = [k for k in kelas_list_filter if k.mata_kuliah.prodi.fakultas_id == fakultas_id]
     kelas_list_filter = sorted(kelas_list_filter, key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas))
 
-    kelas_per_mahasiswa = {}
+    km_per_mahasiswa = {}
     if data:
         mhs_ids_tampil = [m.id for m in data]
         km_list = (
@@ -100,13 +100,14 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
         for km in km_list:
             if user.role == "dosen" and km.kelas_id not in kelas_accessible_ids:
                 continue
-            kelas_per_mahasiswa.setdefault(km.mahasiswa_id, []).append(km.kelas)
+            km_per_mahasiswa.setdefault(km.mahasiswa_id, []).append(km)
 
     return {
         "request": request, "user": user, "data": data, "pesan": pesan,
         "q": q or "", "f_fakultas_id": fakultas_id, "f_prodi_id": prodi_id, "f_kelas_id": kelas_id,
         "fakultas_list": fakultas_list, "prodi_list_filter": prodi_list_filter,
-        "kelas_list_filter": kelas_list_filter, "kelas_per_mahasiswa": kelas_per_mahasiswa,
+        "kelas_list_filter": kelas_list_filter, "km_per_mahasiswa": km_per_mahasiswa,
+        "kelas_tujuan_list": sorted(kelas_accessible, key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas)),
     }
 
 
