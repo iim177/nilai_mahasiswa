@@ -16,7 +16,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app import models, auth as auth_utils
 from app.utils import excel_helper
-from app.routers.kelas import _to_int
+from app.routers.kelas import _to_int, get_kelas_atau_403
 
 router = APIRouter(prefix="/mahasiswa")
 templates = Jinja2Templates(directory="app/templates")
@@ -143,6 +143,29 @@ def tambah_mahasiswa(
     return RedirectResponse("/mahasiswa", status_code=303)
 
 
+@router.post("/{mhs_id}/tambah-ke-kelas")
+def tambah_ke_kelas(
+    mhs_id: int,
+    kelas_id: int = Form(...),
+    user=Depends(auth_utils.require_login),
+    db: Session = Depends(get_db),
+):
+    """Masukkan mahasiswa ke sebuah kelas langsung dari menu Data Mahasiswa.
+    Dosen cuma boleh ke kelas miliknya yang aktif; superadmin ke kelas manapun."""
+    kelas = get_kelas_atau_403(kelas_id, user, db)
+    mhs = db.query(models.Mahasiswa).filter(models.Mahasiswa.id == mhs_id).first()
+    if kelas and mhs:
+        sudah = (
+            db.query(models.KelasMahasiswa)
+            .filter(models.KelasMahasiswa.kelas_id == kelas_id, models.KelasMahasiswa.mahasiswa_id == mhs_id)
+            .first()
+        )
+        if not sudah:
+            db.add(models.KelasMahasiswa(kelas_id=kelas_id, mahasiswa_id=mhs_id))
+            db.commit()
+    return RedirectResponse("/mahasiswa", status_code=303)
+
+
 @router.post("/{mhs_id}/hapus")
 def hapus_mahasiswa(mhs_id: int, user=Depends(auth_utils.require_superadmin), db: Session = Depends(get_db)):
     """Hapus mahasiswa PERMANEN dari sistem (hilang dari semua kelas). Khusus Superadmin."""
@@ -166,6 +189,7 @@ def download_template(user=Depends(auth_utils.require_login)):
 async def import_excel(
     request: Request,
     file: UploadFile = File(...),
+    kelas_id: str = Form(""),
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
@@ -176,23 +200,46 @@ async def import_excel(
         ctx = _build_context(request, user, db, None, None, None, None, "File Excel tidak valid. Pastikan formatnya sesuai template.")
         return templates.TemplateResponse("mahasiswa/list.html", ctx, status_code=400)
 
+    # Kelas tujuan (opsional). get_kelas_atau_403 memastikan dosen cuma bisa ke kelas miliknya.
+    kelas_id_int = _to_int(kelas_id)
+    kelas_tujuan = get_kelas_atau_403(kelas_id_int, user, db) if kelas_id_int else None
+
     jumlah_baru = 0
     jumlah_lewat = 0
-    npm_sudah_diproses = set()
+    npm_sudah_diproses = set()   # cegah duplikat NPM di dalam file yang sama
+    id_dalam_file = []
     for b in baris:
         if b["npm"] in npm_sudah_diproses:
             jumlah_lewat += 1
             continue
-        sudah_ada = db.query(models.Mahasiswa).filter(models.Mahasiswa.npm == b["npm"]).first()
-        if sudah_ada:
-            jumlah_lewat += 1
-            npm_sudah_diproses.add(b["npm"])
-            continue
-        db.add(models.Mahasiswa(npm=b["npm"], nama=b["nama"]))
         npm_sudah_diproses.add(b["npm"])
-        jumlah_baru += 1
+        mhs = db.query(models.Mahasiswa).filter(models.Mahasiswa.npm == b["npm"]).first()
+        if mhs:
+            jumlah_lewat += 1
+        else:
+            mhs = models.Mahasiswa(npm=b["npm"], nama=b["nama"])
+            db.add(mhs)
+            db.flush()  # supaya mhs.id langsung tersedia
+            jumlah_baru += 1
+        id_dalam_file.append(mhs.id)
+
+    jumlah_masuk_kelas = 0
+    if kelas_tujuan:
+        for mid in id_dalam_file:
+            sudah = (
+                db.query(models.KelasMahasiswa)
+                .filter(models.KelasMahasiswa.kelas_id == kelas_tujuan.id, models.KelasMahasiswa.mahasiswa_id == mid)
+                .first()
+            )
+            if not sudah:
+                db.add(models.KelasMahasiswa(kelas_id=kelas_tujuan.id, mahasiswa_id=mid))
+                jumlah_masuk_kelas += 1
     db.commit()
 
     pesan = f"Berhasil import {jumlah_baru} mahasiswa baru. {jumlah_lewat} NPM sudah ada sebelumnya (dilewati)."
+    if kelas_tujuan:
+        pesan += f" {jumlah_masuk_kelas} mahasiswa dimasukkan ke kelas {kelas_tujuan.mata_kuliah.nama_makul} - {kelas_tujuan.nama_kelas}."
+    elif kelas_id_int:
+        pesan += " Kelas tujuan tidak valid, jadi tidak ada mahasiswa yang dimasukkan ke kelas."
     ctx = _build_context(request, user, db, None, None, None, None, pesan)
     return templates.TemplateResponse("mahasiswa/list.html", ctx)

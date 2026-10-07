@@ -91,9 +91,7 @@
             {% endif %}
           </td>
           <td class="px-5 py-3 text-right whitespace-nowrap">
-            {% if daftar_km %}
-            <button type="button" @click="open = !open" class="text-amber-600 hover:underline text-xs mr-3" x-text="open ? 'Tutup' : 'Atur kelas'"></button>
-            {% endif %}
+            <button type="button" @click="open = !open" class="text-amber-600 hover:underline text-xs mr-3" x-text="open ? 'Tutup' : '{{ 'Atur kelas' if daftar_km else 'Beri kelas' }}'"></button>
             {% if user.role == 'superadmin' %}
             <form method="post" action="/mahasiswa/{{ m.id }}/hapus" class="inline" onsubmit="return confirm('Hapus mahasiswa ini secara permanen? Dia akan hilang dari semua kelas dan tidak bisa dikembalikan.')">
               <button class="text-red-500 hover:underline text-xs">Hapus</button>
@@ -101,7 +99,6 @@
             {% endif %}
           </td>
         </tr>
-        {% if daftar_km %}
         <tr x-show="open" style="display: none;">
           <td colspan="4" class="px-5 pb-4 bg-slate-50">
             {% for km in daftar_km %}
@@ -125,9 +122,18 @@
               </div>
             </div>
             {% endfor %}
+            {% set kelas_sudah = daftar_km|map(attribute='kelas_id')|list %}
+            <form method="post" action="/mahasiswa/{{ m.id }}/tambah-ke-kelas" class="flex items-center gap-2 flex-wrap pt-3">
+              <select name="kelas_id" required class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="" disabled selected>{{ 'Tambah ke kelas lain...' if daftar_km else 'Pilih kelas...' }}</option>
+                {% for kt in kelas_tujuan_list if kt.id not in kelas_sudah %}
+                <option value="{{ kt.id }}">{{ kt.mata_kuliah.nama_makul }} - {{ kt.nama_kelas }} ({{ kt.tahun_ajaran.nama_tahun_ajaran }})</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="text-amber-600 hover:underline text-xs whitespace-nowrap">Masukkan ke kelas</button>
+            </form>
           </td>
         </tr>
-        {% endif %}
       </tbody>
       {% else %}
       <tbody>
@@ -155,6 +161,12 @@
       <h2 class="font-semibold text-sm text-ink-900 mb-1">Import dari Excel</h2>
       <p class="text-xs text-slate-500 mb-3">Kolom: NPM, Nama. <a href="/mahasiswa/template-excel" class="text-amber-600 hover:underline">Download template</a></p>
       <form method="post" action="/mahasiswa/import" enctype="multipart/form-data" class="space-y-3">
+        <select name="kelas_id" class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">Langsung masukkan ke kelas... (opsional)</option>
+          {% for kt in kelas_tujuan_list %}
+          <option value="{{ kt.id }}">{{ kt.mata_kuliah.nama_makul }} - {{ kt.nama_kelas }} ({{ kt.tahun_ajaran.nama_tahun_ajaran }})</option>
+          {% endfor %}
+        </select>
         <input type="file" name="file" accept=".xlsx" required
                class="w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-sm file:font-medium hover:file:bg-slate-200">
         <button class="w-full bg-ink-900 hover:bg-ink-800 text-white text-sm font-medium rounded-lg py-2.5">Import</button>

@@ -150,7 +150,7 @@ def tambah_tahun_ajaran(
     user=Depends(auth_utils.require_superadmin),
     db: Session = Depends(get_db),
 ):
-    db.add(models.TahunAjaran(nama_tahun_ajaran=nama_tahun_ajaran.strip()))
+    db.add(models.TahunAjaran(nama_tahun_ajaran=nama_tahun_ajaran.strip(), is_active=False))
     db.commit()
     return RedirectResponse("/superadmin/tahun-ajaran", status_code=303)
 
