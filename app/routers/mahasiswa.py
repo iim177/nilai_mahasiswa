@@ -102,6 +102,10 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
                 continue
             km_per_mahasiswa.setdefault(km.mahasiswa_id, []).append(km)
 
+    # Mahasiswa yang BELUM punya kelas (menurut yang terlihat oleh user ini) ditaruh paling atas,
+    # supaya hasil import langsung kelihatan & gampang diberi kelas. Sisanya urut nama.
+    data.sort(key=lambda m: (1 if km_per_mahasiswa.get(m.id) else 0, (m.nama or "").lower()))
+
     return {
         "request": request, "user": user, "data": data, "pesan": pesan,
         "q": q or "", "f_fakultas_id": fakultas_id, "f_prodi_id": prodi_id, "f_kelas_id": kelas_id,

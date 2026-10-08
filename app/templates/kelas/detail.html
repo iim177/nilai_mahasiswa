@@ -20,7 +20,7 @@
   {% else %}
   <form method="post" action="/kelas/{{ kelas_id }}/item-nilai/simpan">
     <input type="hidden" name="jenis" value="{{ jenis }}">
-    <div class="overflow-auto max-h-[65vh] rounded-lg border border-slate-100">
+    <div class="overflow-x-auto rounded-lg border border-slate-100">
       <table class="text-sm min-w-full">
         <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
           <tr>
@@ -35,8 +35,8 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for km in anggota %}
-          <tr>
-            <td class="px-4 py-1 sticky left-0 z-10 bg-white font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
+          <tr class="odd:bg-white even:bg-slate-100">
+            <td class="px-4 py-1 sticky left-0 z-10 bg-inherit font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
             {% for it in items %}
             <td class="px-2 py-1">
               {% set nilai_sel = peta.get((it.id, km.id)) %}
@@ -204,7 +204,7 @@
   <p class="text-xs text-slate-500 mt-0.5">Kolom Tugas & Kuis otomatis terisi dari rata-rata di atas. Ketik manual di sini untuk override (menimpa nilai otomatis); kosongkan lagi untuk kembali pakai rata-rata otomatis.</p>
 </div>
 <form method="post" action="/kelas/{{ kelas.id }}/nilai/simpan-semua">
-<div class="bg-white rounded-xl border border-slate-200 overflow-auto max-h-[65vh]">
+<div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
   <table class="w-full text-sm min-w-[820px]">
     <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
       <tr>
@@ -221,7 +221,7 @@
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for a in anggota %}
-      <tr>
+      <tr class="odd:bg-white even:bg-slate-100">
         <td class="px-4 py-1.5 text-slate-500">{{ a.mahasiswa.npm }}</td>
         <td class="px-4 py-1.5 font-medium text-ink-900">{{ a.mahasiswa.nama }}</td>
         <td class="px-2 py-1">
