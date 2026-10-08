@@ -483,7 +483,7 @@ async def simpan_semua_nilai(
         km.nilai_uas = parse(form_data.get(f"uas_{km.id}"))
 
     db.commit()
-    return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)
+    return RedirectResponse(f"/kelas/{kelas_id}#ringkasan", status_code=303)
 
 
 # ---------------------------------------------------------------- EXPORT

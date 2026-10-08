@@ -20,32 +20,32 @@
   {% else %}
   <form method="post" action="/kelas/{{ kelas_id }}/item-nilai/simpan">
     <input type="hidden" name="jenis" value="{{ jenis }}">
-    <div class="overflow-x-auto">
+    <div class="overflow-auto max-h-[65vh] rounded-lg border border-slate-100">
       <table class="text-sm min-w-full">
         <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
           <tr>
-            <th class="text-left px-4 py-2.5 sticky left-0 bg-slate-50">Nama</th>
+            <th class="text-left px-4 py-2 sticky left-0 top-0 z-20 bg-slate-50">Nama</th>
             {% for it in items %}
-            <th class="text-center px-2 py-2.5 w-24">
+            <th class="text-center px-2 py-2 w-24 sticky top-0 z-10 bg-slate-50">
               <span class="normal-case font-medium text-ink-900 block truncate max-w-[90px] mx-auto" title="{{ it.nama }}">{{ it.nama }}</span>
             </th>
             {% endfor %}
-            <th class="text-center px-3 py-2.5 w-20">Rata²</th>
+            <th class="text-center px-3 py-2 w-20 sticky top-0 z-10 bg-slate-50">Rata²</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for km in anggota %}
           <tr>
-            <td class="px-4 py-2 sticky left-0 bg-white font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
+            <td class="px-4 py-1 sticky left-0 z-10 bg-white font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
             {% for it in items %}
-            <td class="px-2 py-2">
+            <td class="px-2 py-1">
               {% set nilai_sel = peta.get((it.id, km.id)) %}
               <input type="number" step="0.1" min="0" max="100" name="nilai_{{ it.id }}_{{ km.id }}"
                      value="{{ nilai_sel if nilai_sel is not none else '' }}"
-                     class="w-16 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                     class="w-16 text-center rounded-md border border-slate-300 px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
             </td>
             {% endfor %}
-            <td class="px-3 py-2 text-center font-semibold text-ink-900">
+            <td class="px-3 py-1 text-center font-semibold text-ink-900">
               {% set rr = km.rata_rata_harian(jenis) %}
               {{ '%.1f'|format(rr) if rr is not none else '-' }}
             </td>
@@ -175,56 +175,73 @@
   </div>
 </div>
 
+<!-- TAB: Tugas | Kuis | Ringkasan -->
+<div x-data="{ tab: ['tugas','kuis','ringkasan'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tugas' }">
+  <div class="flex gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
+    {% for key, label in [('tugas','Tugas Harian'),('kuis','Kuis'),('ringkasan','Ringkasan & Nilai Akhir')] %}
+    <button type="button" @click="tab='{{ key }}'; history.replaceState(null,'','#{{ key }}')"
+            :class="tab==='{{ key }}' ? 'border-amber-500 text-ink-900' : 'border-transparent text-slate-500 hover:text-ink-900'"
+            class="px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <div x-show="tab==='tugas'">
 <!-- NILAI TUGAS HARIAN -->
 {{ spreadsheet_harian("Nilai Tugas Harian", "tugas", item_tugas, anggota, peta_nilai_harian, kelas.id, "tugas") }}
 
+  </div>
+
+  <div x-show="tab==='kuis'" style="display: none;">
 <!-- NILAI KUIS -->
 {{ spreadsheet_harian("Nilai Kuis", "kuis", item_kuis, anggota, peta_nilai_harian, kelas.id, "kuis") }}
 
+  </div>
+
+  <div id="ringkasan" x-show="tab==='ringkasan'" style="display: none;">
 <!-- TABEL NILAI RINGKASAN -->
 <div class="mb-2">
   <h2 class="font-semibold text-sm text-ink-900">Ringkasan Nilai & Nilai Akhir</h2>
   <p class="text-xs text-slate-500 mt-0.5">Kolom Tugas & Kuis otomatis terisi dari rata-rata di atas. Ketik manual di sini untuk override (menimpa nilai otomatis); kosongkan lagi untuk kembali pakai rata-rata otomatis.</p>
 </div>
 <form method="post" action="/kelas/{{ kelas.id }}/nilai/simpan-semua">
-<div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+<div class="bg-white rounded-xl border border-slate-200 overflow-auto max-h-[65vh]">
   <table class="w-full text-sm min-w-[820px]">
     <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
       <tr>
-        <th class="text-left px-4 py-3">NPM</th>
-        <th class="text-left px-4 py-3">Nama</th>
-        <th class="text-center px-3 py-3 w-28">Tugas</th>
-        <th class="text-center px-3 py-3 w-28">Kuis</th>
-        <th class="text-center px-3 py-3 w-24">UTS</th>
-        <th class="text-center px-3 py-3 w-24">UAS</th>
+        <th class="text-left px-4 py-2 sticky top-0 bg-slate-50 z-10">NPM</th>
+        <th class="text-left px-4 py-2 sticky top-0 bg-slate-50 z-10">Nama</th>
+        <th class="text-center px-3 py-2 w-28 sticky top-0 bg-slate-50 z-10">Tugas</th>
+        <th class="text-center px-3 py-2 w-28 sticky top-0 bg-slate-50 z-10">Kuis</th>
+        <th class="text-center px-3 py-2 w-24 sticky top-0 bg-slate-50 z-10">UTS</th>
+        <th class="text-center px-3 py-2 w-24 sticky top-0 bg-slate-50 z-10">UAS</th>
         {% if kelas.pakai_bobot %}
-        <th class="text-center px-3 py-3 w-24">Akhir</th>
+        <th class="text-center px-3 py-2 w-24 sticky top-0 bg-slate-50 z-10">Akhir</th>
         {% endif %}
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for a in anggota %}
       <tr>
-        <td class="px-4 py-2.5 text-slate-500">{{ a.mahasiswa.npm }}</td>
-        <td class="px-4 py-2.5 font-medium text-ink-900">{{ a.mahasiswa.nama }}</td>
-        <td class="px-2 py-2">
+        <td class="px-4 py-1.5 text-slate-500">{{ a.mahasiswa.npm }}</td>
+        <td class="px-4 py-1.5 font-medium text-ink-900">{{ a.mahasiswa.nama }}</td>
+        <td class="px-2 py-1">
           {% set rr_tugas = a.rata_rata_harian('tugas') %}
           <input type="number" step="0.1" min="0" max="100" name="tugas_{{ a.id }}"
                  value="{{ a.nilai_tugas if a.nilai_tugas is not none else '' }}"
                  placeholder="{{ '%.1f'|format(rr_tugas) if rr_tugas is not none else 'otomatis' }}"
-                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
         </td>
-        <td class="px-2 py-2">
+        <td class="px-2 py-1">
           {% set rr_kuis = a.rata_rata_harian('kuis') %}
           <input type="number" step="0.1" min="0" max="100" name="kuis_{{ a.id }}"
                  value="{{ a.nilai_kuis if a.nilai_kuis is not none else '' }}"
                  placeholder="{{ '%.1f'|format(rr_kuis) if rr_kuis is not none else 'otomatis' }}"
-                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                 class="w-20 text-center rounded-md border border-slate-300 px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
         </td>
-        <td class="px-2 py-2"><input type="number" step="0.1" min="0" max="100" name="uts_{{ a.id }}" value="{{ a.nilai_uts if a.nilai_uts is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
-        <td class="px-2 py-2"><input type="number" step="0.1" min="0" max="100" name="uas_{{ a.id }}" value="{{ a.nilai_uas if a.nilai_uas is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
+        <td class="px-2 py-1"><input type="number" step="0.1" min="0" max="100" name="uts_{{ a.id }}" value="{{ a.nilai_uts if a.nilai_uts is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
+        <td class="px-2 py-1"><input type="number" step="0.1" min="0" max="100" name="uas_{{ a.id }}" value="{{ a.nilai_uas if a.nilai_uas is not none else '' }}" class="w-20 text-center rounded-md border border-slate-300 px-1 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></td>
         {% if kelas.pakai_bobot %}
-        <td class="px-3 py-2 text-center font-semibold text-ink-900">{{ '%.1f'|format(a.nilai_akhir()) if a.nilai_akhir() is not none else '-' }}</td>
+        <td class="px-3 py-1 text-center font-semibold text-ink-900">{{ '%.1f'|format(a.nilai_akhir()) if a.nilai_akhir() is not none else '-' }}</td>
         {% endif %}
       </tr>
       {% else %}
@@ -241,4 +258,28 @@
 {% endif %}
 </form>
 
+  </div>
+</div>
+
+<script>
+/* Enter di kotak nilai = pindah ke baris bawah (kolom yang sama), seperti spreadsheet.
+   Di baris terakhir tidak terjadi apa-apa; simpan lewat tombol Simpan. */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  var el = e.target;
+  if (!(el.tagName === 'INPUT' && el.type === 'number')) return;
+  var td = el.closest('td');
+  var tr = td && td.closest('tr');
+  if (!tr) return;               /* input di luar tabel (mis. bobot): biarkan submit normal */
+  e.preventDefault();
+  var col = Array.prototype.indexOf.call(tr.children, td);
+  var next = tr.nextElementSibling;
+  while (next) {
+    var cell = next.children[col];
+    var inp = cell && cell.querySelector('input[type=number]');
+    if (inp) { inp.focus(); inp.select(); return; }
+    next = next.nextElementSibling;
+  }
+});
+</script>
 {% endblock %}
