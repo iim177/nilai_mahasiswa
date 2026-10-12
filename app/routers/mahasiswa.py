@@ -11,12 +11,12 @@ from fastapi import APIRouter, Request, Depends, Form, UploadFile, File
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 
 from app.database import get_db
 from app import models, auth as auth_utils
 from app.utils import excel_helper
-from app.routers.kelas import _to_int, get_kelas_atau_403
+from app.routers.kelas import _to_int, get_kelas_atau_403, tentukan_scope_ta, _redirect_setelah_aksi
 
 router = APIRouter(prefix="/mahasiswa")
 templates = Jinja2Templates(directory="app/templates")
@@ -36,15 +36,39 @@ def _kelas_yang_bisa_diakses(user, db: Session):
     return q.all()
 
 
-def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan):
+def _terapkan_scope_ta(query, mode_ta, ta_ids):
+    """Batasi daftar mahasiswa menurut tahun ajaran yang dipilih.
+    - "semua"    : semua mahasiswa
+    - "spesifik" : yang terdaftar di kelas tahun ajaran itu
+    - "aktif"    : yang terdaftar di kelas tahun ajaran AKTIF, ATAU belum punya kelas sama sekali
+                   (mis. hasil import baru, supaya bisa langsung diberi kelas)"""
+    if mode_ta == "semua":
+        return query
+    km_di_ta = (
+        select(models.KelasMahasiswa.mahasiswa_id)
+        .join(models.Kelas, models.KelasMahasiswa.kelas_id == models.Kelas.id)
+        .where(models.Kelas.tahun_ajaran_id.in_(list(ta_ids)))
+    )
+    if mode_ta == "spesifik":
+        return query.filter(models.Mahasiswa.id.in_(km_di_ta))
+    punya_kelas = select(models.KelasMahasiswa.mahasiswa_id)
+    return query.filter(or_(models.Mahasiswa.id.in_(km_di_ta), ~models.Mahasiswa.id.in_(punya_kelas)))
+
+
+def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan, ta_raw=None):
     """Menyusun daftar mahasiswa (sudah difilter/dicari) + data untuk dropdown filter & badge kelas."""
     kelas_accessible = _kelas_yang_bisa_diakses(user, db)
+    mode_ta, ta_ids, label_ta = tentukan_scope_ta(user, db, ta_raw)
+    if ta_ids is not None:
+        kelas_accessible = [k for k in kelas_accessible if k.tahun_ajaran_id in ta_ids]
     kelas_accessible_ids = {k.id for k in kelas_accessible}
+    aktif_ids = {t.id for t in db.query(models.TahunAjaran).filter(models.TahunAjaran.is_active == True).all()}
 
     if kelas_id and kelas_id not in kelas_accessible_ids:
         kelas_id = None
 
     query = db.query(models.Mahasiswa)
+    query = _terapkan_scope_ta(query, mode_ta, ta_ids)
 
     if q and q.strip():
         kata = f"%{q.strip()}%"
@@ -98,9 +122,13 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
             .all()
         )
         for km in km_list:
-            if user.role == "dosen" and km.kelas_id not in kelas_accessible_ids:
+            if km.kelas_id not in kelas_accessible_ids:
                 continue
             km_per_mahasiswa.setdefault(km.mahasiswa_id, []).append(km)
+
+    ta_list_filter = db.query(models.TahunAjaran).order_by(models.TahunAjaran.id.desc()).all()
+    if user.role == "dosen":
+        ta_list_filter = [t for t in ta_list_filter if t.is_active]
 
     # Mahasiswa yang BELUM punya kelas (menurut yang terlihat oleh user ini) ditaruh paling atas,
     # supaya hasil import langsung kelihatan & gampang diberi kelas. Sisanya urut nama.
@@ -111,7 +139,12 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan)
         "q": q or "", "f_fakultas_id": fakultas_id, "f_prodi_id": prodi_id, "f_kelas_id": kelas_id,
         "fakultas_list": fakultas_list, "prodi_list_filter": prodi_list_filter,
         "kelas_list_filter": kelas_list_filter, "km_per_mahasiswa": km_per_mahasiswa,
-        "kelas_tujuan_list": sorted(kelas_accessible, key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas)),
+        # tujuan "beri/pindah kelas": kelas tahun ajaran aktif (atau tahun yang sedang dipilih)
+        "kelas_tujuan_list": sorted(
+            [k for k in kelas_accessible if mode_ta == "spesifik" or k.tahun_ajaran_id in aktif_ids],
+            key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas)),
+        "mode_ta": mode_ta, "label_ta": label_ta, "ta_list_filter": ta_list_filter,
+        "f_ta": "semua" if mode_ta == "semua" else (str(next(iter(ta_ids))) if mode_ta == "spesifik" else ""),
     }
 
 
@@ -122,6 +155,7 @@ def list_mahasiswa(
     fakultas_id: str = None,
     prodi_id: str = None,
     kelas_id: str = None,
+    tahun_ajaran_id: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
@@ -129,7 +163,7 @@ def list_mahasiswa(
     prodi_id = _to_int(prodi_id)
     kelas_id = _to_int(kelas_id)
 
-    ctx = _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan=None)
+    ctx = _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan=None, ta_raw=tahun_ajaran_id)
     return templates.TemplateResponse("mahasiswa/list.html", ctx)
 
 
@@ -151,6 +185,7 @@ def tambah_mahasiswa(
 def tambah_ke_kelas(
     mhs_id: int,
     kelas_id: int = Form(...),
+    kembali: str = Form(""),
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
@@ -167,7 +202,7 @@ def tambah_ke_kelas(
         if not sudah:
             db.add(models.KelasMahasiswa(kelas_id=kelas_id, mahasiswa_id=mhs_id))
             db.commit()
-    return RedirectResponse("/mahasiswa", status_code=303)
+    return _redirect_setelah_aksi(None, kembali or "mahasiswa")
 
 
 @router.post("/{mhs_id}/hapus")
@@ -245,5 +280,6 @@ async def import_excel(
         pesan += f" {jumlah_masuk_kelas} mahasiswa dimasukkan ke kelas {kelas_tujuan.mata_kuliah.nama_makul} - {kelas_tujuan.nama_kelas}."
     elif kelas_id_int:
         pesan += " Kelas tujuan tidak valid, jadi tidak ada mahasiswa yang dimasukkan ke kelas."
-    ctx = _build_context(request, user, db, None, None, None, None, pesan)
+    ta_import = str(kelas_tujuan.tahun_ajaran_id) if kelas_tujuan else None
+    ctx = _build_context(request, user, db, None, None, None, None, pesan, ta_raw=ta_import)
     return templates.TemplateResponse("mahasiswa/list.html", ctx)

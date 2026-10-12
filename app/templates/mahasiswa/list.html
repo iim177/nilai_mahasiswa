@@ -5,6 +5,7 @@
   <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">Akademik</p>
   <h1 class="font-display text-2xl text-ink-900 mt-1">Data Mahasiswa</h1>
   <p class="text-slate-500 text-sm mt-1">Data umum (Nama + NPM). Assign mahasiswa ke kelas lewat halaman detail Kelas; pindah/keluarkan lewat tombol Atur kelas di tabel ini.</p>
+  <p class="text-xs text-slate-400 mt-1">Menampilkan: {{ label_ta }}. Mahasiswa yang belum punya kelas selalu tampil di paling atas.</p>
 </div>
 
 {% if pesan %}
@@ -16,8 +17,21 @@
   <div class="flex flex-wrap items-end justify-between gap-4">
     <div class="flex flex-wrap items-end gap-3">
       <div>
+        <label class="block text-xs text-slate-500 mb-1">Tahun Ajaran</label>
+        <select name="tahun_ajaran_id" onchange="document.getElementById('f_fak').value=''; document.getElementById('f_prodi').value=''; document.getElementById('f_kelas').value=''; document.getElementById('filterForm').submit()"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">Tahun ajaran aktif</option>
+          {% for t in ta_list_filter %}
+          <option value="{{ t.id }}" {{ 'selected' if f_ta == t.id|string }}>{{ t.nama_tahun_ajaran }}{{ ' (Nonaktif)' if not t.is_active }}</option>
+          {% endfor %}
+          {% if user.role == 'superadmin' %}
+          <option value="semua" {{ 'selected' if f_ta == 'semua' }}>Semua tahun ajaran</option>
+          {% endif %}
+        </select>
+      </div>
+      <div>
         <label class="block text-xs text-slate-500 mb-1">Fakultas</label>
-        <select name="fakultas_id" onchange="document.getElementById('f_prodi').value=''; document.getElementById('f_kelas').value=''; document.getElementById('filterForm').submit()"
+        <select id="f_fak" name="fakultas_id" onchange="document.getElementById('f_prodi').value=''; document.getElementById('f_kelas').value=''; document.getElementById('filterForm').submit()"
                 class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
           <option value="">Semua Fakultas</option>
           {% for f in fakultas_list %}
@@ -45,7 +59,7 @@
           {% endfor %}
         </select>
       </div>
-      {% if f_fakultas_id or f_prodi_id or f_kelas_id or q %}
+      {% if f_fakultas_id or f_prodi_id or f_kelas_id or q or f_ta %}
       <a href="/mahasiswa" class="text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-3 py-2 text-ink-900">Reset</a>
       {% endif %}
     </div>
@@ -106,7 +120,7 @@
               <span class="text-slate-600">{{ km.kelas.mata_kuliah.nama_makul }} - {{ km.kelas.nama_kelas }}</span>
               <div class="flex items-center gap-3 flex-wrap">
                 <form method="post" action="/kelas/{{ km.kelas_id }}/pindah/{{ km.id }}" class="flex items-center gap-2" onsubmit="return confirm('Pindahkan {{ m.nama }} ke kelas terpilih? Nilainya di kelas ini tidak ikut terbawa.')">
-                  <input type="hidden" name="kembali" value="mahasiswa">
+                  <input type="hidden" name="kembali" value="mahasiswa{{ '?' ~ request.url.query if request.url.query else '' }}">
                   <select name="kelas_tujuan_id" required class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
                     <option value="" disabled selected>Pindah ke kelas...</option>
                     {% for kt in kelas_tujuan_list if kt.id != km.kelas_id %}
@@ -116,7 +130,7 @@
                   <button type="submit" class="text-amber-600 hover:underline text-xs whitespace-nowrap">Pindahkan</button>
                 </form>
                 <form method="post" action="/kelas/{{ km.kelas_id }}/keluarkan/{{ km.id }}" onsubmit="return confirm('Keluarkan {{ m.nama }} dari kelas ini? Nilainya di kelas ini akan terhapus.')">
-                  <input type="hidden" name="kembali" value="mahasiswa">
+                  <input type="hidden" name="kembali" value="mahasiswa{{ '?' ~ request.url.query if request.url.query else '' }}">
                   <button class="text-red-500 hover:underline text-xs whitespace-nowrap">Keluarkan</button>
                 </form>
               </div>
@@ -124,6 +138,7 @@
             {% endfor %}
             {% set kelas_sudah = daftar_km|map(attribute='kelas_id')|list %}
             <form method="post" action="/mahasiswa/{{ m.id }}/tambah-ke-kelas" class="flex items-center gap-2 flex-wrap pt-3">
+              <input type="hidden" name="kembali" value="mahasiswa{{ '?' ~ request.url.query if request.url.query else '' }}">
               <select name="kelas_id" required class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
                 <option value="" disabled selected>{{ 'Tambah ke kelas lain...' if daftar_km else 'Pilih kelas...' }}</option>
                 {% for kt in kelas_tujuan_list if kt.id not in kelas_sudah %}
@@ -138,7 +153,7 @@
       {% else %}
       <tbody>
         <tr><td colspan="4" class="px-5 py-8 text-center text-slate-400">
-          {% if q or f_fakultas_id or f_prodi_id or f_kelas_id %}Tidak ada mahasiswa yang cocok dengan filter/pencarian ini.{% else %}Belum ada data mahasiswa.{% endif %}
+          {% if q or f_fakultas_id or f_prodi_id or f_kelas_id %}Tidak ada mahasiswa yang cocok dengan filter/pencarian ini.{% elif mode_ta == 'aktif' %}Belum ada mahasiswa di tahun ajaran aktif.{% if user.role == 'superadmin' %} Pilih "Semua tahun ajaran" di filter untuk melihat mahasiswa tahun sebelumnya.{% endif %}{% else %}Belum ada data mahasiswa.{% endif %}
         </td></tr>
       </tbody>
       {% endfor %}

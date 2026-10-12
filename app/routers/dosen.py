@@ -1,5 +1,6 @@
 """
 Route dashboard untuk DOSEN.
+Hanya menampilkan kelas dari Tahun Ajaran yang AKTIF (tahun nonaktif tidak boleh dilihat dosen).
 """
 
 from fastapi import APIRouter, Request, Depends
@@ -18,7 +19,8 @@ def dashboard(request: Request, user=Depends(auth_utils.require_login), db: Sess
     kelas_list = (
         db.query(models.Kelas)
         .options(joinedload(models.Kelas.mata_kuliah), joinedload(models.Kelas.tahun_ajaran))
-        .filter(models.Kelas.dosen_id == user.id)
+        .join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
+        .filter(models.Kelas.dosen_id == user.id, models.TahunAjaran.is_active == True)
         .order_by(models.Kelas.id.desc())
         .all()
     )

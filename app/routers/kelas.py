@@ -29,6 +29,38 @@ def _to_int(value):
         return None
 
 
+def tentukan_scope_ta(user, db: Session, ta_raw):
+    """
+    Tentukan Tahun Ajaran mana yang sedang "dilihat" dari pilihan filter.
+    Hasil: (mode, set_id_ta atau None, label)
+      - "" / tidak valid -> mode "aktif"   : semua Tahun Ajaran yang AKTIF (DEFAULT)
+      - "<id>"           -> mode "spesifik": satu Tahun Ajaran itu saja
+      - "semua"          -> mode "semua"   : tanpa batas tahun (HANYA superadmin)
+    Dosen selalu dibatasi ke Tahun Ajaran aktif (tahun nonaktif tidak boleh dilihat dosen).
+    """
+    semua_ta = db.query(models.TahunAjaran).all()
+    aktif = {t.id: t for t in semua_ta if t.is_active}
+    ta_raw = (ta_raw or "").strip()
+
+    if user.role == "superadmin":
+        if ta_raw == "semua":
+            return "semua", None, "semua tahun ajaran"
+        ta_id = _to_int(ta_raw)
+        if ta_id:
+            for t in semua_ta:
+                if t.id == ta_id:
+                    label = t.nama_tahun_ajaran + ("" if t.is_active else " (nonaktif)")
+                    return "spesifik", {ta_id}, label
+    else:
+        ta_id = _to_int(ta_raw)
+        if ta_id and ta_id in aktif:
+            return "spesifik", {ta_id}, aktif[ta_id].nama_tahun_ajaran
+
+    nama = ", ".join(t.nama_tahun_ajaran for t in aktif.values())
+    label = f"tahun ajaran aktif ({nama})" if nama else "tahun ajaran aktif (belum ada yang aktif)"
+    return "aktif", set(aktif.keys()), label
+
+
 def get_kelas_atau_403(kelas_id: int, user, db: Session):
     """
     Ambil kelas, pastikan dosen hanya boleh akses kelas yang dia ampu,
@@ -81,15 +113,14 @@ def list_kelas(
     prodi_id: str = None,
     mata_kuliah_id: str = None,
     tahun_ajaran_id: str = None,
-    hanya_aktif: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
     fakultas_id = _to_int(fakultas_id)
     prodi_id = _to_int(prodi_id)
     mata_kuliah_id = _to_int(mata_kuliah_id)
-    tahun_ajaran_id = _to_int(tahun_ajaran_id)
-    hanya_aktif_bool = bool(hanya_aktif)  # checkbox: ada nilai apapun = dicentang
+    mode_ta, ta_ids, label_ta = tentukan_scope_ta(user, db, tahun_ajaran_id)
+    f_ta = "semua" if mode_ta == "semua" else (str(next(iter(ta_ids))) if mode_ta == "spesifik" else "")
 
     q = db.query(models.Kelas).options(
         joinedload(models.Kelas.mata_kuliah).joinedload(models.MataKuliah.prodi).joinedload(models.Prodi.fakultas),
@@ -102,14 +133,10 @@ def list_kelas(
         q = q.filter(models.Kelas.dosen_id == user.id)
         q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
         q = q.filter(models.TahunAjaran.is_active == True)
-    elif hanya_aktif_bool:
-        # Superadmin dengan checkbox "hanya tampilkan tahun aktif" dicentang
-        q = q.join(models.TahunAjaran, models.Kelas.tahun_ajaran_id == models.TahunAjaran.id)
-        q = q.filter(models.TahunAjaran.is_active == True)
 
     # ---- Filter pencarian (Fakultas -> Prodi -> Mata Kuliah, + Tahun Ajaran) ----
-    if tahun_ajaran_id:
-        q = q.filter(models.Kelas.tahun_ajaran_id == tahun_ajaran_id)
+    if ta_ids is not None:
+        q = q.filter(models.Kelas.tahun_ajaran_id.in_(list(ta_ids)))
     if mata_kuliah_id:
         q = q.filter(models.Kelas.mata_kuliah_id == mata_kuliah_id)
     elif prodi_id:
@@ -151,8 +178,8 @@ def list_kelas(
             "fakultas_list": fakultas_list, "prodi_list_filter": prodi_list_filter,
             "makul_list_filter": makul_list_filter, "ta_list_filter": ta_list_filter,
             "f_fakultas_id": fakultas_id, "f_prodi_id": prodi_id,
-            "f_mata_kuliah_id": mata_kuliah_id, "f_tahun_ajaran_id": tahun_ajaran_id,
-            "hanya_aktif": hanya_aktif_bool,
+            "f_mata_kuliah_id": mata_kuliah_id, "f_ta": f_ta,
+            "mode_ta": mode_ta, "label_ta": label_ta,
         },
     )
 
@@ -174,7 +201,7 @@ def tambah_kelas(
     )
     db.add(k)
     db.commit()
-    return RedirectResponse("/kelas", status_code=303)
+    return RedirectResponse(f"/kelas?tahun_ajaran_id={tahun_ajaran_id}", status_code=303)
 
 
 @router.post("/{kelas_id}/hapus")
@@ -387,8 +414,8 @@ def assign_mahasiswa(
 
 def _redirect_setelah_aksi(kelas_id, kembali: str):
     """Setelah keluarkan/pindah: balik ke halaman Data Mahasiswa kalau aksinya dari sana."""
-    if kembali == "mahasiswa":
-        return RedirectResponse("/mahasiswa", status_code=303)
+    if kembali == "mahasiswa" or kembali.startswith("mahasiswa?"):
+        return RedirectResponse("/" + kembali, status_code=303)
     if kelas_id is None:
         return RedirectResponse("/kelas", status_code=303)
     return RedirectResponse(f"/kelas/{kelas_id}", status_code=303)

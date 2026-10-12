@@ -5,6 +5,7 @@
   <div>
     <p class="text-xs uppercase tracking-wider text-amber-600 font-semibold">{{ 'Akademik' if user.role=='superadmin' else 'Dosen' }}</p>
     <h1 class="font-display text-2xl text-ink-900 mt-1">{{ 'Semua Kelas' if user.role=='superadmin' else 'Kelas Saya' }}</h1>
+    <p class="text-xs text-slate-400 mt-1">Menampilkan kelas: {{ label_ta }}</p>
   </div>
   {% if user.role == 'superadmin' %}
   <button x-data @click="$refs.formTambah.classList.toggle('hidden')"
@@ -57,6 +58,19 @@
   <p class="text-xs font-medium text-slate-500 mb-3">Cari Kelas</p>
   <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
     <div>
+      <label class="block text-xs text-slate-500 mb-1">Tahun Ajaran</label>
+      <select name="tahun_ajaran_id" onchange="document.getElementById('filterForm').submit()"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <option value="">Tahun ajaran aktif</option>
+        {% for t in ta_list_filter %}
+        <option value="{{ t.id }}" {{ 'selected' if f_ta == t.id|string }}>{{ t.nama_tahun_ajaran }}{{ ' (Nonaktif)' if not t.is_active }}</option>
+        {% endfor %}
+        {% if user.role == 'superadmin' %}
+        <option value="semua" {{ 'selected' if f_ta == 'semua' }}>Semua tahun ajaran</option>
+        {% endif %}
+      </select>
+    </div>
+    <div>
       <label class="block text-xs text-slate-500 mb-1">Fakultas</label>
       <select name="fakultas_id" onchange="document.getElementById('f_prodi').value=''; document.getElementById('f_makul').value=''; document.getElementById('filterForm').submit()"
               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
@@ -86,27 +100,9 @@
         {% endfor %}
       </select>
     </div>
-    <div>
-      <label class="block text-xs text-slate-500 mb-1">Tahun Ajaran</label>
-      <select name="tahun_ajaran_id" onchange="document.getElementById('filterForm').submit()"
-              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-        <option value="">Semua Tahun Ajaran</option>
-        {% for t in ta_list_filter %}
-        <option value="{{ t.id }}" {{ 'selected' if f_tahun_ajaran_id==t.id }}>{{ t.nama_tahun_ajaran }}{{ ' (Nonaktif)' if not t.is_active }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="flex items-end flex-wrap gap-3">
-      {% if user.role == 'superadmin' %}
-      <label class="flex items-center gap-2 text-sm text-slate-600 whitespace-nowrap">
-        <input type="checkbox" name="hanya_aktif" value="1" {{ 'checked' if hanya_aktif }}
-               onchange="document.getElementById('filterForm').submit()"
-               class="rounded border-slate-300 text-amber-500 focus:ring-amber-500">
-        Hanya tahun aktif
-      </label>
-      {% endif %}
-      {% if f_fakultas_id or f_prodi_id or f_mata_kuliah_id or f_tahun_ajaran_id or hanya_aktif %}
-      <a href="/kelas" class="text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-3 py-2 text-ink-900">Reset Filter</a>
+    <div class="flex items-end">
+      {% if f_fakultas_id or f_prodi_id or f_mata_kuliah_id or f_ta %}
+      <a href="/kelas" class="w-full text-center text-sm border border-slate-300 hover:border-amber-400 rounded-lg px-3 py-2 text-ink-900">Reset Filter</a>
       {% endif %}
     </div>
   </div>
@@ -133,7 +129,9 @@
   </div>
   {% else %}
   <div class="md:col-span-2 bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-400 text-sm">
-    Belum ada kelas.
+    {% if f_fakultas_id or f_prodi_id or f_mata_kuliah_id %}Tidak ada kelas yang cocok dengan filter ini.
+    {% elif mode_ta == 'aktif' %}Belum ada kelas di tahun ajaran aktif.{% if user.role == 'superadmin' %} Buat kelas baru, atau pilih Tahun Ajaran lain di filter untuk melihat kelas tahun sebelumnya.{% endif %}
+    {% else %}Belum ada kelas di tahun ajaran ini.{% endif %}
   </div>
   {% endfor %}
 </div>
