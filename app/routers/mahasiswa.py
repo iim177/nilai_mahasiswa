@@ -7,6 +7,9 @@ Route untuk data MAHASISWA (general, belum terikat kelas):
 - Download template Excel
 """
 
+import re
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -20,6 +23,12 @@ from app.routers.kelas import _to_int, get_kelas_atau_403, tentukan_scope_ta, _r
 
 router = APIRouter(prefix="/mahasiswa")
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _kunci_alami(teks):
+    """Kunci urut "alami": angka dibandingkan sebagai angka (NPM 99 sebelum 100), huruf tidak peka besar-kecil."""
+    return [(0, int(p), "") if p.isdigit() else (1, 0, p.lower())
+            for p in re.split(r"(\d+)", teks or "") if p != ""]
 
 
 def _kelas_yang_bisa_diakses(user, db: Session):
@@ -55,7 +64,7 @@ def _terapkan_scope_ta(query, mode_ta, ta_ids):
     return query.filter(or_(models.Mahasiswa.id.in_(km_di_ta), ~models.Mahasiswa.id.in_(punya_kelas)))
 
 
-def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan, ta_raw=None):
+def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan, ta_raw=None, urut="", arah="naik"):
     """Menyusun daftar mahasiswa (sudah difilter/dicari) + data untuk dropdown filter & badge kelas."""
     kelas_accessible = _kelas_yang_bisa_diakses(user, db)
     mode_ta, ta_ids, label_ta = tentukan_scope_ta(user, db, ta_raw)
@@ -132,7 +141,24 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan,
 
     # Mahasiswa yang BELUM punya kelas (menurut yang terlihat oleh user ini) ditaruh paling atas,
     # supaya hasil import langsung kelihatan & gampang diberi kelas. Sisanya urut nama.
-    data.sort(key=lambda m: (1 if km_per_mahasiswa.get(m.id) else 0, (m.nama or "").lower()))
+    if urut in ("nama", "npm"):
+        # urutan pilihan user (klik judul kolom): murni menurut kolom itu
+        data.sort(key=lambda m: _kunci_alami(m.nama if urut == "nama" else m.npm), reverse=(arah == "turun"))
+    else:
+        data.sort(key=lambda m: (1 if km_per_mahasiswa.get(m.id) else 0, (m.nama or "").lower()))
+
+    # Tautan judul kolom: bawa semua filter yang sedang aktif + arah urut berikutnya
+    f_ta_val = "semua" if mode_ta == "semua" else (str(next(iter(ta_ids))) if mode_ta == "spesifik" else "")
+    dasar = {}
+    if q and q.strip():
+        dasar["q"] = q.strip()
+    for kunci, nilai in (("fakultas_id", fakultas_id), ("prodi_id", prodi_id), ("kelas_id", kelas_id), ("tahun_ajaran_id", f_ta_val)):
+        if nilai:
+            dasar[kunci] = nilai
+
+    def _tautan(kolom):
+        arah_baru = "turun" if (urut == kolom and arah == "naik") else "naik"
+        return "/mahasiswa?" + urlencode({**dasar, "urut": kolom, "arah": arah_baru})
 
     return {
         "request": request, "user": user, "data": data, "pesan": pesan,
@@ -144,6 +170,7 @@ def _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan,
             [k for k in kelas_accessible if mode_ta == "spesifik" or k.tahun_ajaran_id in aktif_ids],
             key=lambda k: (k.mata_kuliah.nama_makul, k.nama_kelas)),
         "mode_ta": mode_ta, "label_ta": label_ta, "ta_list_filter": ta_list_filter,
+        "urut": urut, "arah": arah, "link_nama": _tautan("nama"), "link_npm": _tautan("npm"),
         "f_ta": "semua" if mode_ta == "semua" else (str(next(iter(ta_ids))) if mode_ta == "spesifik" else ""),
     }
 
@@ -156,6 +183,8 @@ def list_mahasiswa(
     prodi_id: str = None,
     kelas_id: str = None,
     tahun_ajaran_id: str = None,
+    urut: str = None,
+    arah: str = None,
     user=Depends(auth_utils.require_login),
     db: Session = Depends(get_db),
 ):
@@ -163,7 +192,8 @@ def list_mahasiswa(
     prodi_id = _to_int(prodi_id)
     kelas_id = _to_int(kelas_id)
 
-    ctx = _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan=None, ta_raw=tahun_ajaran_id)
+    ctx = _build_context(request, user, db, q, fakultas_id, prodi_id, kelas_id, pesan=None, ta_raw=tahun_ajaran_id,
+                         urut=urut if urut in ("nama", "npm") else "", arah=arah if arah in ("naik", "turun") else "naik")
     return templates.TemplateResponse("mahasiswa/list.html", ctx)
 
 

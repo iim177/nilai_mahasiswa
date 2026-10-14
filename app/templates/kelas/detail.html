@@ -24,7 +24,7 @@
       <table class="text-sm min-w-full">
         <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
           <tr>
-            <th class="text-left px-4 py-2 sticky left-0 top-0 z-20 bg-slate-50">Nama</th>
+            <th class="text-left px-4 py-2 sticky left-0 top-0 z-20 bg-slate-50">Nama / NPM</th>
             {% for it in items %}
             <th class="text-center px-2 py-2 w-24 sticky top-0 z-10 bg-slate-50">
               <span class="normal-case font-medium text-ink-900 block truncate max-w-[90px] mx-auto" title="{{ it.nama }}">{{ it.nama }}</span>
@@ -35,8 +35,11 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for km in anggota %}
-          <tr class="odd:bg-white even:bg-slate-100">
-            <td class="px-4 py-1 sticky left-0 z-10 bg-inherit font-medium text-ink-900 whitespace-nowrap">{{ km.mahasiswa.nama }}</td>
+          <tr class="odd:bg-white even:bg-slate-100" data-nama="{{ km.mahasiswa.nama }}" data-npm="{{ km.mahasiswa.npm }}">
+            <td class="px-4 py-1 sticky left-0 z-10 bg-inherit max-w-[230px]">
+              <div class="font-medium text-ink-900 text-sm truncate leading-tight" title="{{ km.mahasiswa.nama }}">{{ km.mahasiswa.nama }}</div>
+              <div class="text-[11px] text-slate-400 leading-tight">{{ km.mahasiswa.npm }}</div>
+            </td>
             {% for it in items %}
             <td class="px-2 py-1">
               {% set nilai_sel = peta.get((it.id, km.id)) %}
@@ -175,6 +178,13 @@
   </div>
 </div>
 
+<!-- URUTKAN (berlaku untuk tabel Tugas, Kuis, dan Ringkasan sekaligus) -->
+<div class="flex items-center justify-end gap-2 mb-3 text-xs text-slate-500">
+  <span>Urutkan:</span>
+  <button type="button" data-urut-btn="nama" class="px-3 py-1 rounded-lg border border-slate-300 hover:border-amber-400">Nama</button>
+  <button type="button" data-urut-btn="npm" class="px-3 py-1 rounded-lg border border-slate-300 hover:border-amber-400">NPM</button>
+</div>
+
 <!-- TAB: Tugas | Kuis | Ringkasan -->
 <div x-data="{ tab: ['tugas','kuis','ringkasan'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tugas' }">
   <div class="flex gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
@@ -221,7 +231,7 @@
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for a in anggota %}
-      <tr class="odd:bg-white even:bg-slate-100">
+      <tr class="odd:bg-white even:bg-slate-100" data-nama="{{ a.mahasiswa.nama }}" data-npm="{{ a.mahasiswa.npm }}">
         <td class="px-4 py-1.5 text-slate-500">{{ a.mahasiswa.npm }}</td>
         <td class="px-4 py-1.5 font-medium text-ink-900">{{ a.mahasiswa.nama }}</td>
         <td class="px-2 py-1">
@@ -281,5 +291,60 @@ document.addEventListener('keydown', function (e) {
     next = next.nextElementSibling;
   }
 });
+</script>
+<script>
+/* Urutkan baris di semua tabel nilai menurut Nama / NPM. Klik lagi = balik arah. Pilihan diingat di browser. */
+(function () {
+  var KEY = 'sindo_urut_kelas';
+  var tombol = document.querySelectorAll('[data-urut-btn]');
+  if (!tombol.length) return;
+  function pecah(t) {
+    return String(t || '').toLowerCase().split(/(\d+)/).filter(function (p) { return p !== ''; })
+      .map(function (p) { return /^\d+$/.test(p) ? [0, parseInt(p, 10), ''] : [1, 0, p]; });
+  }
+  function bandingkan(a, b) {
+    var x = pecah(a), y = pecah(b), n = Math.max(x.length, y.length);
+    for (var i = 0; i < n; i++) {
+      if (!x[i]) return -1;
+      if (!y[i]) return 1;
+      for (var k = 0; k < 3; k++) {
+        if (x[i][k] < y[i][k]) return -1;
+        if (x[i][k] > y[i][k]) return 1;
+      }
+    }
+    return 0;
+  }
+  var keadaan = { by: 'nama', arah: 'naik' };
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY));
+    if (s && (s.by === 'nama' || s.by === 'npm')) keadaan = { by: s.by, arah: s.arah === 'turun' ? 'turun' : 'naik' };
+  } catch (e) {}
+  function terapkan() {
+    var atr = 'data-' + keadaan.by;
+    document.querySelectorAll('tbody').forEach(function (tb) {
+      var baris = Array.prototype.filter.call(tb.children, function (r) { return r.getAttribute(atr) !== null; });
+      if (baris.length < 2) return;
+      baris.sort(function (r1, r2) {
+        var h = bandingkan(r1.getAttribute(atr), r2.getAttribute(atr));
+        return keadaan.arah === 'turun' ? -h : h;
+      });
+      baris.forEach(function (r) { tb.appendChild(r); });
+    });
+    tombol.forEach(function (b) {
+      var kolom = b.getAttribute('data-urut-btn'), aktif = kolom === keadaan.by;
+      b.textContent = (kolom === 'nama' ? 'Nama' : 'NPM') + (aktif ? (keadaan.arah === 'turun' ? ' \u25BC' : ' \u25B2') : '');
+      ['bg-amber-50', 'border-amber-400', 'text-ink-900'].forEach(function (c) { b.classList.toggle(c, aktif); });
+    });
+  }
+  tombol.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var by = b.getAttribute('data-urut-btn');
+      keadaan = { by: by, arah: (keadaan.by === by && keadaan.arah === 'naik') ? 'turun' : 'naik' };
+      try { localStorage.setItem(KEY, JSON.stringify(keadaan)); } catch (e) {}
+      terapkan();
+    });
+  });
+  terapkan();
+})();
 </script>
 {% endblock %}

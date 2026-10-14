@@ -14,6 +14,8 @@
 
 <!-- FILTER & PENCARIAN -->
 <form method="get" action="/mahasiswa" id="filterForm" class="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+  <input type="hidden" name="urut" value="{{ urut }}">
+  <input type="hidden" name="arah" value="{{ arah }}">
   <div class="flex flex-wrap items-end justify-between gap-4">
     <div class="flex flex-wrap items-end gap-3">
       <div>
@@ -81,8 +83,8 @@
     <table class="w-full text-sm">
       <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
         <tr>
-          <th class="text-left px-5 py-3">NPM</th>
-          <th class="text-left px-5 py-3">Nama</th>
+          <th class="text-left px-5 py-3"><a href="{{ link_npm }}" class="hover:text-ink-900 whitespace-nowrap">NPM{{ ' ▲' if urut == 'npm' and arah == 'naik' else (' ▼' if urut == 'npm' else '') }}</a></th>
+          <th class="text-left px-5 py-3"><a href="{{ link_nama }}" class="hover:text-ink-900 whitespace-nowrap">Nama{{ ' ▲' if urut == 'nama' and arah == 'naik' else (' ▼' if urut == 'nama' else '') }}</a></th>
           <th class="text-left px-5 py-3">Kelas</th>
           <th class="w-44"></th>
         </tr>
